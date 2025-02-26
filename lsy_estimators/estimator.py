@@ -109,17 +109,17 @@ class KalmanFilter(Estimator):
             dim_z=dim_z,
         )
 
-        dim_x = UKFData.get_state_dim(self.data)
+        dim_x = UKFData.get_state_dim(self.data) - 1
         # print(f"dim_x={dim_x}")
 
         Q, R = self.create_covariance_matrices(
             dim_x=dim_x,
-            dim_z=dim_z,
+            dim_z=dim_z - 1,
             varQ_pos=1e-8,
-            varQ_quat=1e-4,
+            varQ_rot=1e-6,
             varQ_forces_motor=1e-1,
             varR_pos=1e-9,
-            varR_quat=5e-8,
+            varR_rot=5e-9,
             dt=dt,
         )
         # Q = self.create_Q(
@@ -142,7 +142,7 @@ class KalmanFilter(Estimator):
         With aggressive Q and R values, this needs to be called in the beginning. Otherwise the estimator might fail.
         """
         self.data = self.data.replace(pos=pos, quat=quat)
-        dim_x = UKFData.as_state_array(self.data).shape[0]
+        dim_x = UKFData.get_state_dim(self.data) - 1
         self.data = self.data.replace(covariance=np.eye(dim_x) * 1e-6)
 
     def create_covariance_matrices(
@@ -150,10 +150,10 @@ class KalmanFilter(Estimator):
         dim_x: int,
         dim_z: int,
         varQ_pos: float,
-        varQ_quat: float,
+        varQ_rot: float,
         varQ_forces_motor: float,
         varR_pos: float,
-        varR_quat: float,
+        varR_rot: float,
         dt: float,
         varQ_forces_dist: float = 1e-9,
         varQ_torques_dist: float = 1e-12,
@@ -174,24 +174,22 @@ class KalmanFilter(Estimator):
             dim=2, dt=dt, var=varQ_pos, block_size=3, order_by_dim=False
         )  # pos & vel
         Q[0:3, 0:3] = Q_xyz[0:3, 0:3]  # pos
-        Q[7:10, 7:10] = Q_xyz[3:6, 3:6]  # vel
-        Q[0:3, 7:10] = Q_xyz[0:3, 3:6]  # pos <-> vel
-        Q[7:10, 0:3] = Q_xyz[3:6, 0:3]  # pos <-> vel
+        Q[6:9, 6:9] = Q_xyz[3:6, 3:6]  # vel
+        Q[0:3, 6:9] = Q_xyz[0:3, 3:6]  # pos <-> vel
+        Q[6:9, 0:3] = Q_xyz[3:6, 0:3]  # pos <-> vel
 
         # Rotational equations
-        # since quat and angvel have different length, it's a little more tricky
         Q_rot = Q_discrete_white_noise(
-            dim=2, dt=dt, var=varQ_quat, block_size=3, order_by_dim=False
+            dim=2, dt=dt, var=varQ_rot, block_size=3, order_by_dim=False
         )  # quat & angvel
-        Q[3:5, 3:5] = Q_rot[0:2, 0:2]  # quat12
-        Q[5:7, 5:7] = Q_rot[0:2, 0:2]  # quat34
-        Q[10:13, 10:13] = Q_rot[3:6, 3:6]  # angvel
+        Q[3:6, 3:6] = Q_rot[0:3, 0:3]  # rot
+        Q[9:12, 9:12] = Q_rot[3:6, 3:6]  # angvel
         # We know that all quat_dot dependent on all angvel
         # => fill in the whole 4x3 and 3x4 matrix blocks with the variance
-        Q[3:7, 10:13] = Q_rot[0, 3]  # quat <-> angvel
-        Q[10:13, 3:7] = Q_rot[3, 0]  # quat <-> angvel
+        Q[3:6, 9:12] = Q_rot[0, 3]  # quat <-> angvel
+        Q[9:12, 3:6] = Q_rot[3, 0]  # quat <-> angvel
 
-        i = 13  # for keeping how big the state (index) is
+        i = 12  # for keeping how big the state (index) is
 
         # Motor forces TODO: maybe add correlation of acceleration (and angular acc) to motor forces
         if self.data.forces_motor is not None:
@@ -201,12 +199,12 @@ class KalmanFilter(Estimator):
             print(Q_forces)
             Q[i : i + 2, i : i + 2] = np.eye(2) * Q_forces[1, 1]  # forces 1&2
             Q[i + 2 : i + 4, i + 2 : i + 4] = np.eye(2) * Q_forces[1, 1]  # forces 3&4
-            Q[7:10, i : i + 4] = Q_forces[0, 1]  # forces <-> vel
-            Q[i : i + 4, 7:10] = Q_forces[1, 0]  # forces <-> vel
-            Q[10:13, i : i + 4] = (
+            Q[6:9, i : i + 4] = Q_forces[0, 1]  # forces <-> vel
+            Q[i : i + 4, 6:9] = Q_forces[1, 0]  # forces <-> vel
+            Q[9:12, i : i + 4] = (
                 Q_forces[0, 1] * 0.04
             )  # forces <-> angvel, times arm length (F=rxl)
-            Q[i : i + 4, 10:13] = (
+            Q[i : i + 4, 9:12] = (
                 Q_forces[1, 0] * 0.04
             )  # forces <-> angvel, times arm length (F=rxl)
             # Q[i : i + 4] *= varQ_forces_motor  # TODO move index as in dataclass example and make optional
@@ -224,7 +222,7 @@ class KalmanFilter(Estimator):
         # very low noise on the position ("mm precision" => even less noise)
         R[:3, :3] = R[:3, :3] * varR_pos
         # "high" measurements noise on the angles, estimate: 0.01 constains all values => std=3e-3 TODO look at new quat measurements
-        R[3:, 3:] = R[3:, 3:] * varR_quat
+        R[3:, 3:] = R[3:, 3:] * varR_rot
 
         return Q, R
 
