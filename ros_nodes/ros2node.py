@@ -34,6 +34,8 @@ from visualization_msgs.msg import MarkerArray
 from lsy_estimators.estimator import KalmanFilter
 from lsy_estimators.estimator_legacy import StateEstimator
 from ros_nodes.ros2utils import (
+    append_measurement,
+    append_state,
     create_array,
     create_marker_array,
     create_pose,
@@ -190,7 +192,7 @@ class MPEstimator:
             # self.logger.info(f"{self.estimator.data.pos=}")
             # Estimation loop
             while not self._shutdown.is_set():
-                current_time = time.time()
+                loop_start_time = time.time()
 
                 with self._tf_msg_buffer.get_lock():
                     data = np.asarray(self._tf_msg_buffer, dtype=np.float64, copy=True)
@@ -216,33 +218,49 @@ class MPEstimator:
                 if n_tf_msg >= 1:
                     dt = tf_timestamp - self.time_stamp_last_prediction
                     self.time_stamp_last_prediction = tf_timestamp
+
                     self.estimator.predict(dt)
-                    # print(f"MEASUREMENT {pos=}, {quat=}")
                     self.estimator.correct(pos, quat)
 
-                dt = current_time - self.time_stamp_last_prediction
-                data = self.estimator.predict(dt)
-                # self.logger.info(f"{data.pos=}, {data.quat=}, {data.vel=}, {data.ang_vel=}, ")
-                self.time_stamp_last_prediction = current_time
+                    # estimator_data = self.estimator.step(pos, quat, dt)
+
+                time_stamp_now = time.time()
+                dt = time_stamp_now - self.time_stamp_last_prediction
+                self.time_stamp_last_prediction = time_stamp_now
+                estimator_data = self.estimator.predict(dt)
+
+                # Giving new estimate to publisher
                 with self._pose_buffer.get_lock():
-                    self._pose_buffer[:3] = data.pos
-                    self._pose_buffer[3:] = data.quat
+                    self._pose_buffer[:3] = estimator_data.pos
+                    self._pose_buffer[3:] = estimator_data.quat
                 with self._twist_buffer.get_lock():
-                    self._twist_buffer[:3] = data.vel
-                    self._twist_buffer[3:] = data.ang_vel
-                if data.forces_motor is not None:
+                    self._twist_buffer[:3] = estimator_data.vel
+                    self._twist_buffer[3:] = estimator_data.ang_vel
+                if estimator_data.forces_motor is not None:
                     with self._forces_buffer.get_lock():
-                        self._forces_buffer[:] = data.forces_motor
-                if data.forces_dist is not None:
+                        self._forces_buffer[:] = estimator_data.forces_motor
+                if estimator_data.forces_dist is not None:
                     with self._wrench_buffer.get_lock():
-                        self._wrench_buffer[:3] = data.forces_dist
-                        if data.torques_dist is not None:
-                            self._wrench_buffer[3:] = data.torques_dist
+                        self._wrench_buffer[:3] = estimator_data.forces_dist
+                        if estimator_data.torques_dist is not None:
+                            self._wrench_buffer[3:] = estimator_data.torques_dist
                 self._publish_update.set()
+
+                if self.settings.save_data:
+                    append_state(self.data_est, time_stamp_now, estimator_data)
+                    if n_tf_msg >= 1:
+                        if n_cmd_messages >= 1 and self.input_needed:
+                            append_measurement(self.data_meas, tf_timestamp, pos, quat, cmd)
+                        if not self.input_needed:
+                            append_measurement(self.data_meas, tf_timestamp, pos, quat, None)
+
+                # if k % 100 == 0:
+                #     self.logger.info(f"{estimator_data.forces_dist=}")
+
                 remaining = (
-                    (1 / self.frequency) - (time.time() - current_time) - 1.25 * 1e-4
+                    (1 / self.frequency) - (time.time() - loop_start_time) - 1.25 * 1e-4
                 )  # TODO remove magic number, replace with "controller"
-                if k % 1000 == 0:
+                if k % 1000 == 999:
                     self.logger.info(f"Freq: {k / (time.perf_counter() - global_time)}")
                 k += 1
                 if remaining > 0:

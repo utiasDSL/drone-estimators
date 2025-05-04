@@ -4,42 +4,24 @@
 # Supported models: See lsy_models.models.available_models, i.e. fitted_DI_rpy, mellinger_rpyt
 
 [global] # TODO rename to global
-frequency = 240
-timings = true    # print the timings of each estimator
-save_data = false # store the raw data and estimates into pickle files
+frequency = 300  # frequency of the estimator. This should be >= Vicon frequency
+timings = true   # print the timings of each estimator
+save_data = true # store the raw data and estimates into pickle files
 
-# [estimator1]
-# estimator_type = "legacy"
-# drone_name = "cf6"
-# drone_config = "cf2x_L250"
-# dynamics_model = "mellinger_rpyt"
-# estimate_forces_motor = true
-# estimate_forces_dist = true
-# estimate_torques_dist = true
-
-# [estimator2]
-# estimator_type = "legacy"
-# drone_name = "cf99"
-# drone_config = "cf2x_L250"
-# dynamics_model = "fitted_DI_rpy"
-# estimate_forces_motor = false
-# estimate_forces_dist = true
-# estimate_torques_dist = true
-
-# [estimator3]
-# estimator_type = "ukf"
-# drone_name = "cf52"
-# drone_config = "cf2x_L250"
-# dynamics_model = "fitted_DI_rpy"
-# estimate_forces_motor = false
-# estimate_forces_dist = false
-# estimate_torques_dist = false
-
-[estimator4]
-estimator_type = "legacy"
+[estimator3]
+estimator_type = "ukf"
 drone_name = "cf52"
 drone_config = "cf2x_L250"
-dynamics_model = "fitted_DI_rpy"
+dynamics_model = "fitted_DI_rpyt"
 estimate_forces_motor = false
 estimate_forces_dist = true
 estimate_torques_dist = true
+
+# [estimator4]
+# estimator_type = "ukf"
+# drone_name = "cf52"
+# drone_config = "cf2x_L250"
+# dynamics_model = "fitted_DI_DD_rpyt"
+# estimate_forces_motor = true
+# estimate_forces_dist = true
+# estimate_torques_dist = true

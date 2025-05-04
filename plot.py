@@ -3,19 +3,87 @@ from __future__ import annotations
 import os
 import pickle
 import time
-from collections import deque
+from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
+import lsy_models.utils.rotation as R
 import matplotlib.animation as animation
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from scipy.signal import savgol_filter
-from scipy.spatial.transform import Rotation as R
+from scipy.signal import bilinear, butter, lfilter, lfiltic, savgol_filter
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+
+
+def state_variable_filter(y: NDArray, t: NDArray, f_c: float = 1, N_deriv: int = 2) -> NDArray:
+    """A state variable filter that low pass filters the signal and computes the derivatives.
+
+    Args:
+        y (NDArray): The signal to be filtered. Can be 1D (signal_length) or 2D (batch_size, signal_length).
+        t (NDArray): The time values for the signal. Optimally fixed sampling frequency.
+        f_c (float, optional): Corner frequency of the filter in Hz. Defaults to 1.
+        N_deriv (int, optional): Number of derivatives to be computed. Defaults to 2.
+
+    Returns:
+        NDArray: The filtered signal and its derivatives. Shape (batch_size, N_deriv+1, signal_length).
+    """
+    if y.ndim == 1:
+        y = y[None, :]  # Add batch dimension if single signal
+    batch_size, signal_length = y.shape
+
+    # The filter needs to have a minimum of two extra states
+    # One for the filtered input signal and one for the actual filter
+    N_ord = N_deriv + 2
+    omega_c = 2 * np.pi * f_c
+    f_s = 1 / np.mean(np.diff(t))
+
+    b, a = butter(N=N_ord, Wn=omega_c, analog=True)
+    b_dig, a_dig = bilinear(b, a, fs=f_s)
+    a_flipped = np.flip(a)
+
+    def f(t, x, u):
+        x_dot = []
+        x_dot_last = 0
+        # The first states are a simple integrator chain
+        for i in np.arange(1, N_ord):
+            x_dot.append(x[i])
+        # Last state uses the filter coefficients
+        for i in np.arange(0, N_ord):
+            x_dot_last -= a_flipped[i] * x[i]
+        x_dot_last += b[0] * u(t)
+        x_dot.append(x_dot_last)
+
+        return x_dot
+
+    results = np.zeros((batch_size, N_deriv + 1, signal_length))
+
+    for i in range(batch_size):
+        # Define input
+        # Prefilter input backwards to remove time shift
+        # Add padding to remove filter oscillations in data
+        pad = 100
+        y_backwards = np.flip(y[i], axis=-1)
+        y_backwards_padded = np.concatenate([np.ones(pad) * y_backwards[0], y_backwards])
+        zi = lfiltic(
+            b_dig, a_dig, y_backwards_padded, x=y_backwards_padded
+        )  # initial filter conditions
+        y_backwards, _ = lfilter(b_dig, a_dig, y_backwards_padded, axis=-1, zi=zi)
+        u = interp1d(
+            t, np.flip(y_backwards[pad:], axis=-1), kind="linear", fill_value="extrapolate"
+        )
+
+        # Solve system with initial conditions
+        x0 = np.zeros(N_ord)
+        x0[0] = y[i, 0]
+        sol = solve_ivp(f, [t[0], t[-1]], x0, t_eval=t, args=(u,))
+
+        results[i] = sol.y[:-1]  # Last state is not of interest
+
+    return results.squeeze()  # Remove batch dim if not needed
 
 
 def setaxs1(axs1, t_start, t_end):
@@ -35,9 +103,10 @@ def setaxs1(axs1, t_start, t_end):
     axs1[0, 2].set_title("Velocity x [m/s]")
     axs1[1, 2].set_title("Velocity y [m/s]")
     axs1[2, 2].set_title("Velocity z [m/s]")
-    axs1[0, 2].set_ylim(-1.5, 1.5)
-    axs1[1, 2].set_ylim(-1.5, 1.5)
-    axs1[2, 2].set_ylim(-1.5, 1.5)
+    vel = 3
+    axs1[0, 2].set_ylim(-vel, vel)
+    axs1[1, 2].set_ylim(-vel, vel)
+    axs1[2, 2].set_ylim(-vel, vel)
     axs1[0, 3].set_title("Velocity Error x [m/s]")
     axs1[1, 3].set_title("Velocity Error y [m/s]")
     axs1[2, 3].set_title("Velocity Error z [m/s]")
@@ -88,24 +157,32 @@ def setaxs2(axs2, t_start, t_end):
 
 
 def setaxs3(axs3, t_start, t_end):
-    axs3[0, 0].set_title("Disturbance Force x [N]")
-    axs3[1, 0].set_title("Disturbance Force y [N]")
-    axs3[2, 0].set_title("Disturbance Force z [N]")
+    axs3[0, 0].set_title("Disturbance Force")
+    axs3[2, 0].set_xlabel("Time [s]")
+    # axs3[1, 0].set_title("Disturbance Force")
+    # axs3[2, 0].set_title("Disturbance Force")
+    axs3[0, 0].set_ylabel("Force x [N]")
+    axs3[1, 0].set_ylabel("Force y [N]")
+    axs3[2, 0].set_ylabel("Force z [N]")
     axs3[0, 0].set_ylim(-0.1, 0.1)
     axs3[1, 0].set_ylim(-0.1, 0.1)
     axs3[2, 0].set_ylim(-0.1, 0.1)
-    axs3[0, 1].set_title("Force Error [N]")
-    axs3[1, 1].set_title("Force Error [N]")
-    axs3[2, 1].set_title("Force Error [N]")
-    axs3[0, 1].set_title("Disturbance Torque x [Nm]")
-    axs3[1, 1].set_title("Disturbance Torque y [Nm]")
-    axs3[2, 1].set_title("Disturbance Torque z [Nm]")
+    # axs3[0, 1].set_title("Force Error [N]")
+    # axs3[1, 1].set_title("Force Error [N]")
+    # axs3[2, 1].set_title("Force Error [N]")
+    axs3[0, 1].set_title("Disturbance Torque")
+    axs3[2, 1].set_xlabel("Time [s]")
+    # axs3[1, 1].set_title("Disturbance Torque y")
+    # axs3[2, 1].set_title("Disturbance Torque z")
+    axs3[0, 1].set_ylabel("Torque x [Nm]")
+    axs3[1, 1].set_ylabel("Torque y [Nm]")
+    axs3[2, 1].set_ylabel("Torque z [Nm]")
     axs3[0, 1].set_ylim(-0.002, 0.002)
     axs3[1, 1].set_ylim(-0.002, 0.002)
     axs3[2, 1].set_ylim(-0.002, 0.002)
-    axs3[0, 3].set_title("Torque Error [Nm]")
-    axs3[1, 3].set_title("Torque Error [Nm]")
-    axs3[2, 3].set_title("Torque Error [Nm]")
+    # axs3[0, 3].set_title("Torque Error [Nm]")
+    # axs3[1, 3].set_title("Torque Error [Nm]")
+    # axs3[2, 3].set_title("Torque Error [Nm]")
 
     for ax in axs3.flat:
         ax.legend()
@@ -248,6 +325,17 @@ def plotaxs2(
     #     color="tab:orange",
     # )  # plotting 3 std
 
+    if len(data["cmd_rpy"]) > 0:
+        axs2[0, 0].plot(
+            data["time"], data["cmd_rpy"][:, 0], label=f"{label} cmd", color=color, linestyle=":"
+        )
+        axs2[1, 0].plot(
+            data["time"], data["cmd_rpy"][:, 1], label=f"{label} cmd", color=color, linestyle=":"
+        )
+        axs2[2, 0].plot(
+            data["time"], data["cmd_rpy"][:, 2], label=f"{label} cmd", color=color, linestyle=":"
+        )
+
     if len(data["rpy_error"]) > 0:
         axs2[0, 1].plot(data["time"], data["rpy_error"][:, 0], label=label, color=color)
         axs2[1, 1].plot(data["time"], data["rpy_error"][:, 1], label=label, color=color)
@@ -302,9 +390,41 @@ def plotaxs3(
     t_start=0,
     t_end=10,
 ):
+    # axs3[0, 0].plot(
+    #     data["time"], -data["vel"][:, 0] * 0.015, label=f"{label} -0.015*v", color="black"
+    # )
+    # axs3[1, 0].plot(
+    #     data["time"], -data["vel"][:, 1] * 0.015, label=f"{label} -0.015*v", color="black"
+    # )
+    # axs3[2, 0].plot(
+    #     data["time"], -data["vel"][:, 2] * 0.015, label=f"{label} -0.015*v", color="black"
+    # )
+    # axs3[0, 0].plot(
+    #     data["time"],
+    #     -data["vel"][:, 0] * np.abs(data["vel"][:, 0]) * 0.01,
+    #     label=f"{label} -0.01*v*|v|",
+    #     color="grey",
+    # )
+    # axs3[1, 0].plot(
+    #     data["time"],
+    #     -data["vel"][:, 1] * np.abs(data["vel"][:, 1]) * 0.01,
+    #     label=f"{label} -0.01*v*|v|",
+    #     color="grey",
+    # )
+    # axs3[2, 0].plot(
+    #     data["time"],
+    #     -data["vel"][:, 2] * np.abs(data["vel"][:, 2]) * 0.01,
+    #     label=f"{label} -0.01*v*|v|",
+    #     color="grey",
+    # )
     ### force and torque
     if len(data["forces_dist"]) > 0:  # check if the posterior even contains the force
-        axs3[0, 0].plot(data["time"], data["forces_dist"][:, 0], label=label, color=color)
+        axs3[0, 0].plot(
+            data["time"],
+            data["forces_dist"][:, 0],  # + data["vel"][:, 0] * 0.015
+            label=label,
+            color=color,
+        )
         axs3[0, 0].fill_between(
             data["time"],
             -3 * data["covariance"][:, 13] + data["forces_dist"][:, 0],
@@ -321,9 +441,15 @@ def plotaxs3(
         #         linestyles="--",
         #     )
         # except:
+
         #     ...  # We do not care if the index cant be found. Simply dont plot
 
-        axs3[1, 0].plot(data["time"], data["forces_dist"][:, 1], label=label, color=color)
+        axs3[1, 0].plot(
+            data["time"],
+            data["forces_dist"][:, 1],  # + data["vel"][:, 1] * 0.015,
+            label=label,
+            color=color,
+        )
         # axs3[1, 0].fill_between(
         #     data["time"],
         #     -3 * data["P_post"][:, 13] + data["force_est"][:, 1],
@@ -368,7 +494,6 @@ def plotaxs3(
         #         colors="green",
         #         linestyles="--",
         #     )
-
     if len(data["torques_dist"]) > 0:  # check if the posterior even contains the torque
         axs3[0, 1].plot(data["time"], data["torques_dist"][:, 0], label=label, color=color)
         # axs3[0, 1].fill_between(
@@ -470,7 +595,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     fig1.tight_layout(pad=pad)
     fig2, axs2 = plt.subplots(3, 4, figsize=figsize)  # rpy and rpy dot
     fig2.tight_layout(pad=pad)
-    fig3, axs3 = plt.subplots(3, 4, figsize=figsize)  # force and torque
+    fig3, axs3 = plt.subplots(3, 2, figsize=figsize)  # force and torque
     # fig3, axs3 = plt.subplots(3, 2, figsize=figsize) # force and torque
     # fig3, axs3 = plt.subplots(1, figsize=figsize)  # force and torque
     fig3.tight_layout(pad=pad)
@@ -495,25 +620,51 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     ##################################################
     # Calculating measured vel and ang_vel from finite differences
     # However, first check if data is from sim => vel and ang_vel are available
-    if len(data_meas["vel"]) == 0:
-        dt_avg = np.mean(np.diff(data_meas["time"]))
+    # data_SGF = defaultdict(list)
+    # if len(data_meas["vel"]) == 0:
+    #     dt_avg = np.mean(np.diff(data_meas["time"]))
 
-        data_meas["pos"] = savgol_filter(data_meas["pos"], 7, 1, axis=0)
-        # data_meas["pos"] = pos_meas_filtered  # TODO remove?
-        # data_meas["vel"] = np.gradient(pos_meas_filtered, data_meas["time"], axis=0)
-        # data_meas["vel"] = savgol_filter(data_meas["vel"], filter_length, filter_order, axis=0)
-        data_meas["vel"] = savgol_filter(data_meas["pos"], 9, 2, deriv=1, delta=dt_avg, axis=0)
+    #     data_SGF["pos"] = savgol_filter(data_meas["pos"], 7, 1, axis=0)
+    #     # data_meas["pos"] = pos_meas_filtered  # TODO remove?
+    #     # data_meas["vel"] = np.gradient(pos_meas_filtered, data_meas["time"], axis=0)
+    #     # data_meas["vel"] = savgol_filter(data_meas["vel"], filter_length, filter_order, axis=0)
+    #     data_SGF["vel"] = savgol_filter(data_meas["pos"], 9, 2, deriv=1, delta=dt_avg, axis=0)
 
-        quat_meas_filtered = savgol_filter(data_meas["quat"], 7, 2, axis=0)
-        data_meas["quat"] = quat_meas_filtered  # TODO remove?
-        data_meas = quat2rpy(data_meas)
+    #     quat_meas_filtered = savgol_filter(data_meas["quat"], 7, 2, axis=0)
+    #     data_SGF["quat"] = quat_meas_filtered  # TODO remove?
+    #     ang_vel = quat2ang_vel(data_meas["quat"], data_meas["time"])
+    #     test = state_variable_filter(ang_vel.T, data_meas["time"], f_c=8, N_deriv=2)
+    #     data_SGF["ang_vel"] = test[:, 0].T
+    #     data_SGF["ang_acc"] = test[:, 1].T
 
-        rot = R.from_euler("xyz", data_meas["rpy"], degrees=True)
-        rpy_dot = savgol_filter(data_meas["rpy"], 7, 1, deriv=1, delta=dt_avg, axis=0)
-        data_meas["ang_vel"] = rpy_dot / 180 * np.pi
-        # data_meas["ang_vel"] = rot.apply(rpy_dot / 180 * np.pi)
+    #     rot = R.from_euler("xyz", data_meas["rpy"], degrees=True)
+    #     rpy_dot = savgol_filter(data_meas["rpy"], 7, 1, deriv=1, delta=dt_avg, axis=0)
+    #     data_meas["ang_vel"] = rpy_dot / 180 * np.pi
 
-    # data_meas["ang_vel"] = quat2ang_vel(quat_meas_filtered, data_meas["time"])
+    data_SVF = defaultdict(list)
+    data_SVF["time"] = data_meas["time"]
+    svf_linear = state_variable_filter(data_meas["pos"].T, data_meas["time"], f_c=6, N_deriv=3)
+    data_SVF["pos"] = svf_linear[:, 0].T
+    data_SVF["vel"] = svf_linear[:, 1].T
+    data_SVF["acc"] = svf_linear[:, 2].T
+    data_SVF["jerk"] = svf_linear[:, 3].T
+
+    svf_rotational = state_variable_filter(data_meas["rpy"].T, data_meas["time"], f_c=8, N_deriv=3)
+    data_SVF["rpy"] = svf_rotational[:, 0].T
+    data_SVF["drpy"] = svf_rotational[:, 1].T
+    data_SVF["ddrpy"] = svf_rotational[:, 2].T
+    data_SVF["dddrpy"] = svf_rotational[:, 3].T
+    rot = R.from_euler("xyz", data_SVF["rpy"])
+    data_SVF["quat"] = rot.as_quat()
+    data_SVF["ang_vel"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["drpy"])
+    data_SVF["ang_acc"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["ddrpy"])
+    data_SVF["ang_jerk"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["dddrpy"])
+
+    svf_input_rpy = state_variable_filter(
+        data_meas["command"][..., :-1].T, data_meas["time"], f_c=8, N_deriv=3
+    )
+    data_SVF["cmd_rpy"] = svf_input_rpy[:, 0].T
+    #
 
     # estimator_datasets[0]["ang_vel"]
 
@@ -530,7 +681,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     for i in range(len(estimator_types)):
         data_est = estimator_datasets[i]
         estimator_times = data_est["time"]
-        measurement_times = data_meas["time"]
+        measurement_times = data_SVF["time"]
         data_new = {}
         for k, v in data_est.items():
             if (
@@ -544,7 +695,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
                 # interpolate measurement to fit estimator data
                 # print(f"Interpolating {k} of {estimator_types[i]}")
                 interpolation = interp1d(
-                    measurement_times, data_meas[k], kind="linear", axis=0, fill_value="extrapolate"
+                    measurement_times, data_SVF[k], kind="linear", axis=0, fill_value="extrapolate"
                 )
                 # values2_interp = interp_func(time1)
                 # interpolation = np.interp(estimator_times, measurement_times, data_meas[k], )
@@ -568,8 +719,8 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     ##################################################
     colors = list(mcolors.TABLEAU_COLORS.values())
     # First, plot measurements
-    plotaxs1(axs1, data_meas, label="meas", linestyle="--", color=colors[0])
-    plotaxs2(axs2, data_meas, label="meas", linestyle="--", color=colors[0])
+    plotaxs1(axs1, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
+    plotaxs2(axs2, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
     # plotaxs3(axs3, data_meas, label="meas", linestyle="--", color="tab:blue")
 
     for i in range(len(estimator_types)):
@@ -650,6 +801,8 @@ def list2array(data: dict[str, list]) -> dict[str, NDArray]:
     """Converts a dictionary of lists to a dictionary of arrays."""
     for k, v in data.items():
         data[k] = np.array(data[k])
+        if np.any(np.isnan(np.array(data[k]))) or np.any(np.isinf(np.array(data[k]))):
+            print(f"[WARNING] nan or inf values encountered in {k}")
     return data
 
 
@@ -662,7 +815,7 @@ def cov2array(data: dict[str, list]) -> dict[str, NDArray]:
 
 def quat2rpy(data: dict[str, NDArray]) -> dict[str, NDArray]:
     """Converts the orientation in the data to euler angles."""
-    data["rpy"] = R.from_quat(data["quat"]).as_euler("xyz", degrees=True)
+    data["rpy"] = R.from_quat(data["quat"]).as_euler("xyz", degrees=False)
     return data
 
 
@@ -696,9 +849,7 @@ def quat2ang_vel(quat, times):
     q1 = quat
     q2 = np.roll(quat, 1, axis=0)
     dt = np.diff(times, prepend=1 / 200)
-    print(np.mean(dt))
     angle, axis = quat2axis_angle(q1, q2)
-    print(angle)
     ang_vel = (angle / dt)[..., None] * axis
     return ang_vel
 
@@ -723,7 +874,7 @@ def dquat2ang_vel(quat, dquat, dt):
     # return R.from_quat(quat).apply(ang_vel)  # RPY rates
 
 
-def rmse(error_array):
+def rmse(error_array: NDArray) -> np.floating:
     """Calculated the RMSE of a time series error."""
     error_value = np.sum(error_array, axis=-1)
     return np.sqrt(np.mean(error_value**2))
@@ -732,9 +883,10 @@ def rmse(error_array):
 if __name__ == "__main__":
     drone_name = "cf52"
     estimator_types = [
-        # "true",
-        "legacy",
-        "ukf_fitted_DI_rpy",
+        # "legacy",
+        "ukf_fitted_DI_rpyt",
+        # "ukf_fitted_DI_D_rpyt",
+        "ukf_fitted_DI_DD_rpyt",
         # "ukf_mellinger_rpyt",
     ]
     estimator_datasets = []
@@ -755,7 +907,7 @@ if __name__ == "__main__":
             data_est = list2array(data_est)
             data_est = quat2rpy(data_est)
             data_est = cov2array(data_est)
-            data_est["time"] -= start_time
+            data_est["time"] -= data_est["time"][0]
             estimator_datasets.append(data_est)
 
     plots(data_meas, estimator_types, estimator_datasets, animate=False, order="", weight=0)

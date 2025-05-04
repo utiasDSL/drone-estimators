@@ -193,6 +193,7 @@ def create_marker_array(
 ) -> MarkerArray:
     """Creates a MarkerArray for visualization in RViz."""
     marker_array = MarkerArray()
+    # print(f"{quat=}")
 
     ### Drone marker
     marker = Marker()
@@ -233,12 +234,12 @@ def create_marker_array(
 
     ### Force Marker
     marker_array.markers.append(
-        make_arrow_marker_from_vector(3, "wrench", pos, force, [0.0, 0.0, 1.0, 1.0])
+        make_arrow_marker_from_vector(3, "wrench", pos, force * 5, [0.0, 0.0, 1.0, 1.0])
     )
 
     ### Torque Marker
     marker_array.markers.append(
-        make_arrow_marker_from_vector(4, "wrench", pos, torque, [1.0, 0.0, 1.0, 1.0])
+        make_arrow_marker_from_vector(4, "wrench", pos, torque * 5, [1.0, 0.0, 1.0, 1.0])
     )
 
     return marker_array
@@ -260,17 +261,19 @@ def append_state(data: defaultdict[str, list], time: float, state: UKFData):
         data["forces_dist"].append(state.forces_dist)
     else:
         data["forces_dist"] = []
-    if state.forces_dist is not None:
+    if state.torques_dist is not None:
         data["torques_dist"].append(state.torques_dist)
     else:
         data["torques_dist"] = []
 
 
 def append_measurement(
-    data: defaultdict[str, list], time: float, pos: Array, quat: Array, command: Array
+    data: defaultdict[str, list], time: float, pos: Array, quat: Array, command: Array | None = None
 ):
     """Appends each measurment data to the corresponding of list in the dictionary."""
     data["time"].append(time)
     data["pos"].append(pos)
     data["quat"].append(quat)
+    if command is None:
+        command = np.zeros_like(quat)
     data["command"].append(command)

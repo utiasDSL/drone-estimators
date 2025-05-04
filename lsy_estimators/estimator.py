@@ -6,6 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Callable
 
+import jax
 import numpy as np
 from lsy_models.models import dynamics_numeric, observation_function
 from lsy_models.utils.constants import Constants
@@ -89,6 +90,9 @@ class KalmanFilter(Estimator):
             initial_obs: Optional, the initial observation of the environment's state. See the environment's observation space for details.
         """
         fx = dynamics_numeric(model, config)
+        hx = observation_function
+        # fx = jax.jit(dynamics_numeric(model, config))
+        # hx = jax.jit(observation_function)
         self.constants = Constants.from_config(config)
 
         dim_x = 13
@@ -100,7 +104,6 @@ class KalmanFilter(Estimator):
             dim_x += 3
         dim_u = 4  # TODO from available models
         dim_z = 7  # pos, quat
-        dt = 1.0 / 200  # default Vicon rate
 
         self.data = UKFData.create_empty(
             forces_motor=estimate_forces_motor,
@@ -116,11 +119,11 @@ class KalmanFilter(Estimator):
         Q, R = self.create_covariance_matrices(
             dim_x=dim_x,
             dim_z=dim_z,
-            varQ_pos=1e-8,
-            varQ_quat=1e-8,
+            varQ_pos=1e-6,
+            varQ_quat=1e-2,
             varQ_forces_motor=1e-1,
             varR_pos=1e-9,
-            varR_quat=5e-8,
+            varR_quat=5e-9,
             dt=dt,
         )
         # Q = self.create_Q(
@@ -129,9 +132,7 @@ class KalmanFilter(Estimator):
         # R = self.create_R(dim_z=dim_z, varR_pos=1e-8, varR_quat=3e-6, dt=dt)
 
         sigma_settings = SigmaPointsSettings.create(n=dim_x, alpha=1e-3, beta=2.0, kappa=0.0)
-        self.settings = UKFSettings.create(
-            SPsettings=sigma_settings, Q=Q, R=R, fx=fx, hx=observation_function
-        )
+        self.settings = UKFSettings.create(SPsettings=sigma_settings, Q=Q, R=R, fx=fx, hx=hx)
 
         # Initialize state and covariance
         if initial_obs is not None:
@@ -199,7 +200,6 @@ class KalmanFilter(Estimator):
             Q_forces = Q_discrete_white_noise(
                 dim=2, dt=dt, var=varQ_forces_motor, block_size=1, order_by_dim=False
             )  # Motor Forces
-            print(Q_forces)
             Q[i : i + 2, i : i + 2] = np.eye(2) * Q_forces[1, 1]  # forces 1&2
             Q[i + 2 : i + 4, i + 2 : i + 4] = np.eye(2) * Q_forces[1, 1]  # forces 3&4
             Q[7:10, i : i + 4] = Q_forces[0, 1]  # forces <-> vel
@@ -221,7 +221,7 @@ class KalmanFilter(Estimator):
             Q[i : i + 3, i : i + 3] *= varQ_torques_dist  # Torque
 
         ### Set measurement noise covariance (tunable). Uncertaints in the measurements. High R -> less trust in measurements
-        R = np.eye(dim_z)
+        R = np.eye(dim_z)  # Assuming uncorrelated noise
         # very low noise on the position ("mm precision" => even less noise)
         R[:3, :3] = R[:3, :3] * varR_pos
         # "high" measurements noise on the angles, estimate: 0.01 constains all values => std=3e-3 TODO look at new quat measurements
@@ -260,15 +260,12 @@ class KalmanFilter(Estimator):
 
     def create_R(self, dim_z: int, varR_pos: float, varR_quat: float, dt: float) -> Array:
         ### Set measurement noise covariance (tunable). Uncertaints in the measurements. High R -> less trust in measurements
-        R = np.eye(dim_z)
+        R = np.eye(dim_z)  # Assuming uncorrelated noise
         # very low noise on the position ("mm precision" => even less noise)
-        R[:3, :3] = R[:3, :3] * varR_pos * dt
+        R[:3, :3] = R[:3, :3] * varR_pos
         # "high" measurements noise on the angles, estimate: 0.01 constains all values => std=3e-3 TODO look at new quat measurements
-        R[3:, 3:] = R[3:, 3:] * varR_quat * dt
+        R[3:, 3:] = R[3:, 3:] * varR_quat
         return R
-
-    # TODO add integration function
-    # TODO make sure quaternion lengths stays 1
 
     def step(self, pos: Array, quat: Array, dt: float, command: Array | None = None) -> UKFData:
         """Steps the UKF by one. Doing one prediction and correction step.
@@ -327,6 +324,8 @@ class KalmanFilter(Estimator):
         # Update observation and dt
         # dt hast to be vectorized to work properly in jax
         self.data = self.data.replace(z=np.concat((pos, quat)))
+
+        # print(f"{quat=}, {self.data.quat=}, {self.data.u[-2]=}")
 
         self.data = ukf_correct(self.data, self.settings)
 

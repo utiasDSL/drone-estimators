@@ -19,6 +19,7 @@ from __future__ import absolute_import, annotations, division, print_function
 
 from typing import TYPE_CHECKING
 
+import jax
 import numpy as np
 from scipy.linalg import block_diag
 
@@ -29,11 +30,12 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
+# @jax.jit
 def ukf_predict_correct(data: UKFData, settings: UKFSettings) -> UKFData:
     """TODO."""
     xp = data.pos.__array_namespace__()
     #### Predict
-    # Calculate sigma pointstf.transform.rotation.x,
+    # Calculate sigma points
     # TODO special sigma points for quaternions!
     sigmas = ukf_calculate_sigma_points(data, settings)
     data_sigmas = UKFData.from_state_array(data, sigmas)
@@ -50,19 +52,8 @@ def ukf_predict_correct(data: UKFData, settings: UKFSettings) -> UKFData:
         command=data.u,
     )
     data_sigmas_dot = UKFData.create(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
-    # print(f"derivatives: {data_sigmas_dot.ang_vel}")
-    # sigmas_dot = QuadrotorState.as_array(sigma_states_dot)
-
-    # print(f"function call = {(t2 - t1) * 1000}ms, as_array = {(t3 - t2) * 1000}ms")
 
     # Integrate dynamics if continuous
-    # TODO implement proper integrator
-    # TODO watch out for quaternion integration! (length and orientation)
-    # sigmas_f = sigmas + sigmas_dot * data.dt
-    # sigmas_f[..., 3:7] = (
-    #     sigmas_f[..., 3:7] / xp.linalg.norm(sigmas_f[..., 3:7], axis=-1)[:, None]
-    # )  # TODO jax cant do that in place
-    # data = data.replace(sigmas_f=sigmas_f)
     data_sigmas_f = integrate_UKFData(data_sigmas, data_sigmas_dot)
     sigmas_f = UKFData.as_state_array(data_sigmas_f)
     data = data.replace(sigmas_f=sigmas_f)
@@ -124,6 +115,7 @@ def ukf_predict_correct(data: UKFData, settings: UKFSettings) -> UKFData:
     return data
 
 
+# @jax.jit
 def ukf_predict(data: UKFData, settings: UKFSettings) -> UKFData:
     """TODO."""
     xp = data.pos.__array_namespace__()
@@ -144,22 +136,26 @@ def ukf_predict(data: UKFData, settings: UKFSettings) -> UKFData:
         torques_dist=data_sigmas.torques_dist,
         command=data.u,
     )
+    # print(f"{pos_dot=}")
     data_sigmas_dot = UKFData.create(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
-    # print(f"derivatives: {data_sigmas_dot.ang_vel}")
-    # sigmas_dot = QuadrotorState.as_array(sigma_states_dot)
-
-    # print(f"function call = {(t2 - t1) * 1000}ms, as_array = {(t3 - t2) * 1000}ms")
 
     # Integrate dynamics if continuous
-    # TODO implement proper integrator
-    # TODO watch out for quaternion integration! (length and orientation)
-    # sigmas_f = sigmas + sigmas_dot * data.dt
-    # sigmas_f[..., 3:7] = (
-    #     sigmas_f[..., 3:7] / xp.linalg.norm(sigmas_f[..., 3:7], axis=-1)[:, None]
-    # )  # TODO jax cant do that in place
-    # data = data.replace(sigmas_f=sigmas_f)
     data_sigmas_f = integrate_UKFData(data_sigmas, data_sigmas_dot)
     sigmas_f = UKFData.as_state_array(data_sigmas_f)
+    data = data.replace(sigmas_f=sigmas_f)
+
+    # Pass prior sigmas through measurment function h(x,u,dt) to get measurement sigmas
+    sigmas_h = settings.hx(
+        pos=data_sigmas_f.pos,
+        quat=data_sigmas_f.quat,
+        vel=data_sigmas_f.vel,
+        ang_vel=data_sigmas_f.ang_vel,
+        command=data.u,
+        forces_motor=data_sigmas_f.forces_motor,
+        forces_dist=data_sigmas_f.forces_dist,
+        torques_dist=data_sigmas_f.torques_dist,
+    )
+    data = data.replace(sigmas_h=sigmas_h)
 
     # Compute prior with unscented transform
     x, P = ukf_unscented_transform(
@@ -173,6 +169,7 @@ def ukf_predict(data: UKFData, settings: UKFSettings) -> UKFData:
     return data
 
 
+# @jax.jit
 def ukf_correct(data: UKFData, settings: UKFSettings) -> UKFData:
     """TODO."""
     xp = data.covariance.__array_namespace__()
