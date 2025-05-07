@@ -33,7 +33,7 @@ from visualization_msgs.msg import MarkerArray
 
 from lsy_estimators.estimator import KalmanFilter
 from lsy_estimators.estimator_legacy import StateEstimator
-from lsy_estimators.ros_nodes.ros2utils import (
+from lsy_estimators.ros_nodes.ros2_utils import (
     append_measurement,
     append_state,
     create_array,
@@ -165,7 +165,7 @@ class MPEstimator:
                 )
 
         # Initialization
-        self.logger.info("Ẁaiting for initial measurement.")
+        self.logger.info("Waiting for initial measurement.")
         while not self._shutdown.is_set():
             with self._tf_msg_buffer.get_lock():
                 data = np.asarray(self._tf_msg_buffer, dtype=np.float64, copy=True)

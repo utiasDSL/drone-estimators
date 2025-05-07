@@ -14,8 +14,8 @@ Either use the estimators directly:
 
 or run the ROS2 node with:
 
-`python lsy_estimators/ros_nodes/ros2node.py`
+`python lsy_estimators/ros_nodes/ros2_node.py`
 
 For the latter, you need to add all drones you want to estimate to the `estimators.toml` file, or create your own file and call
 
-`python lsy_estimators/ros_nodes/ros2node.py --settings <your_estimators.toml>`
+`python lsy_estimators/ros_nodes/ros2_node.py --settings <your_estimators.toml>`
