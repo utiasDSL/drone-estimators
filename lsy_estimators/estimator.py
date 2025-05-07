@@ -121,7 +121,7 @@ class KalmanFilter(Estimator):
             dim_z=dim_z,
             varQ_pos=1e-6,
             varQ_quat=1e-2,
-            varQ_forces_motor=1e-1,
+            varQ_forces_motor=1e-5,
             varR_pos=1e-9,
             varR_quat=5e-9,
             dt=dt,

@@ -33,7 +33,7 @@ from visualization_msgs.msg import MarkerArray
 
 from lsy_estimators.estimator import KalmanFilter
 from lsy_estimators.estimator_legacy import StateEstimator
-from ros_nodes.ros2utils import (
+from lsy_estimators.ros_nodes.ros2utils import (
     append_measurement,
     append_state,
     create_array,
