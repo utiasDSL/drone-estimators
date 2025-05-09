@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
 from lsy_models.utils import rotation as R
-
-from lsy_estimators.structs import UKFData
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from lsy_estimators.structs import UKFData
+
 
 def integrate_UKFData(state: UKFData, state_dot: UKFData) -> UKFData:
+    """Integrates UKFData properly."""
     next_pos, next_quat, next_vel, next_ang_vel, next_forces_motor = _integrate(
         state.pos,
         state.quat,
@@ -58,11 +58,13 @@ def _integrate(
         quat: The orientation of the drone as a quaternion.
         vel: The velocity of the drone.
         ang_vel: The angular velocity of the drone.
-        dpos: The derivative of the position of the drone.
-        drot: The derivative of the quaternion of the drone (3D angular velocity).
-        dvel: The derivative of the velocity of the drone.
-        dang_vel: The derivative of the angular velocity of the drone.
+        pos_dot: The derivative of the position of the drone.
+        quat_dot: The derivative of the quaternion of the drone.
+        vel_dot: The derivative of the velocity of the drone.
+        ang_vel_dot: The derivative of the angular velocity of the drone.
         dt: The time step to integrate over.
+        forces_motor: The forces for the motors.
+        forces_motor_dot: The derivative of the motor forces.
 
     Returns:
         The next position, quaternion, velocity, and roll, pitch, and yaw rates of the drone.

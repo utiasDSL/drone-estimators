@@ -19,7 +19,7 @@ from __future__ import absolute_import, annotations, division, print_function
 
 from typing import TYPE_CHECKING
 
-import jax
+# import jax
 import numpy as np
 from scipy.linalg import block_diag
 
@@ -118,7 +118,7 @@ def ukf_predict_correct(data: UKFData, settings: UKFSettings) -> UKFData:
 # @jax.jit
 def ukf_predict(data: UKFData, settings: UKFSettings) -> UKFData:
     """TODO."""
-    xp = data.pos.__array_namespace__()
+    # xp = data.pos.__array_namespace__()
     #### Predict
     # Calculate sigma pointstf.transform.rotation.x,
     # TODO special sigma points for quaternions!
