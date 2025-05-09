@@ -18,6 +18,16 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# Since motion_capture_tracking might be running on multiple PCs simultaneously,
+# the same /tf topics get published multiple times to the network. This is
+# unintended behavior. Setting it to LOCALHOST will block publishing to the
+# network. We also set it here in the estimators s.t. they also don't publish
+# to the network. Usually, the estimators get started after
+# motion_capture_tracking, but in case the estimators get started first, we
+# get consistent behavior.
+# Note: All ros nodes started after this line will also only publish locally!
+os.environ["ROS_AUTOMATIC_DISCOVERY_RANGE"] = "LOCALHOST"
+
 import numpy as np
 import rclpy
 import toml
@@ -201,7 +211,7 @@ class MPEstimator:
                 with self._cmd_msg_buffer.get_lock():
                     data = np.asarray(self._cmd_msg_buffer, dtype=np.float64, copy=True)
                     self._cmd_msg_buffer[0] = 0
-                n_cmd_messages, cmd_timestamp, cmd = data[0], data[1], data[2:]
+                n_cmd_messages, _, cmd = data[0], data[1], data[2:]
 
                 if n_cmd_messages >= 1 and self.input_needed:
                     # The command is as it is sent to the drone, meaning for attitude interface:
