@@ -4,7 +4,7 @@ This estimator is originally from Chris McKinnon.
 It was adapted to work with similarly to the new estimators for backwards compatability.
 """
 
-from __future__ import division, print_function
+from __future__ import absolute_import, annotations, division, print_function
 
 import math
 from threading import Lock
