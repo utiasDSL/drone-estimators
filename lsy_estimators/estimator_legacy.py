@@ -8,12 +8,19 @@ from __future__ import division, print_function
 
 import math
 from threading import Lock
+from typing import TYPE_CHECKING
 
 import numpy as np
-import scipy.spatial.transform.rotation as R
 import transforms3d as tf
 
 from lsy_estimators.structs import UKFData
+
+if TYPE_CHECKING:
+    from jax import Array as JaxArray
+    from numpy.typing import NDArray
+    from torch import Tensor
+
+    Array = NDArray | JaxArray | Tensor
 
 # from lsy_estimators.quaternions import apply_omega_to_quat, global_to_body, omega_from_quat_quat
 
@@ -27,7 +34,8 @@ class StateEstimator(object):
         The 4 tuning parameters for the Kalman filter
     """
 
-    def __init__(self, filter_parameters):
+    def __init__(self, filter_parameters: tuple):
+        """TODO."""
         # Lock for access to state
         # Makes sure the service does not conflict with normal updates
         self.state_access_lock = Lock()
@@ -78,11 +86,11 @@ class StateEstimator(object):
         # return R.from_quat(self.quat).as_euler("xyz")
 
     @property
-    def omega_b(self):
+    def omega_b(self) -> Array:
         """Return the body angular velocity."""
         return global_to_body(self.quat, self.omega_g)
 
-    def step(self, pos, quat, dt, command=None):
+    def step(self, pos: Array, quat: Array, dt: float, command: Array | None = None) -> UKFData:
         """This function is not part of the legacy estimator and only for compatability."""
         self.dt = dt
         # the transforms3d library used here uses scalar first, so we need to make it scalar first
@@ -95,7 +103,7 @@ class StateEstimator(object):
             self.pos, np.array(np.roll(self.quat, -1)).astype(float), self.vel, self.omega_b
         )
 
-    def predict(self, dt, command=None):
+    def predict(self, dt: float, command: Array | None = None) -> UKFData:
         """This function is not part of the legacy estimator and only for compatability."""
         # Since the legacy estimator doesn't inherently support the prediction/correction
         # form of a Kalman filter, we only step the time in the prediction step. In the
@@ -106,7 +114,7 @@ class StateEstimator(object):
             self.pos, np.array(np.roll(self.quat, -1)).astype(float), self.vel, self.omega_b
         )
 
-    def correct(self, pos, quat, command=None):
+    def correct(self, pos: Array, quat: Array, command: Array | None = None) -> UKFData:
         """This function is not part of the legacy estimator and only for compatability."""
         # Since the legacy estimator doesn't inherently support the prediction/correction
         # form of a Kalman filter, we only step the time in the prediction step. In the
@@ -116,16 +124,16 @@ class StateEstimator(object):
         self.dt = 0
         return data
 
-    def set_input(self, command):
+    def set_input(self, command: Array):
         """This function is not part of the legacy estimator and only for compatability."""
         pass
 
-    def set_state(self, pos, quat):
+    def set_state(self, pos: Array, quat: Array):
         """This function is not part of the legacy estimator and only for compatability."""
         self.pos = pos
         self.quat = np.roll(quat, 1)
 
-    def get_new_measurement(self, position, quaternion):
+    def get_new_measurement(self, position: Array, quaternion: Array):
         """Get a new measurement of position and orientation.
 
         Parameters
@@ -210,7 +218,7 @@ class StateEstimator(object):
             self.time = self.time_meas
 
 
-def omega_from_quat_quat(q1, q2, dt):
+def omega_from_quat_quat(q1: Array, q2: Array, dt: float) -> Array:
     """Convert two quaternions and the time difference to angular velocity.
 
     Parameters:
@@ -269,7 +277,7 @@ def omega_from_quat_quat(q1, q2, dt):
         return angle / dt * r[1:] / tf.quaternions.qnorm(r[1:])
 
 
-def apply_omega_to_quat(q, omega, dt):
+def apply_omega_to_quat(q: Array, omega: Array, dt: float) -> Array:
     """Convert a quaternion q and apply the angular velocity omega to it over dt.
 
     Parameters:
@@ -302,7 +310,7 @@ def apply_omega_to_quat(q, omega, dt):
     return tf.quaternions.qmult(r, q)
 
 
-def global_to_body(q, vec):
+def global_to_body(q: Array, vec: Array) -> Array:
     """Convert a vector from global to body coordinates.
 
     Parameters:
@@ -324,7 +332,7 @@ def global_to_body(q, vec):
     return np.dot(tf.quaternions.quat2mat(q).transpose(), vec)
 
 
-def body_to_global(q, vec):
+def body_to_global(q: Array, vec: Array) -> Array:
     """Convert a vector from global to body coordinates.
 
     Parameters:

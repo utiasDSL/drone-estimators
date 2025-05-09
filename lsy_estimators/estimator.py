@@ -2,11 +2,9 @@
 
 from __future__ import absolute_import, annotations, division, print_function
 
-import time
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-import jax
 import numpy as np
 from lsy_models.models import dynamics_numeric, observation_function
 from lsy_models.utils.constants import Constants
@@ -87,6 +85,9 @@ class KalmanFilter(Estimator):
             model: The name of the model that is to be used.
             config: The setup configuration of the drone.
             filter_type: Either EKF or UKF
+            estimate_forces_motor: If the motor forces should be estimated, defaults to False.
+            estimate_forces_dist: If the disturbance forces should be estimated, defaults to False.
+            estimate_torques_dist: If the disturbance torques should be estimated, defaults to False.
             initial_obs: Optional, the initial observation of the environment's state. See the environment's observation space for details.
         """
         fx = dynamics_numeric(model, config)
@@ -241,6 +242,7 @@ class KalmanFilter(Estimator):
         varQ_forces_dist: float = 1e-9,
         varQ_torques_dist: float = 1e-12,
     ) -> Array:
+        """TODO."""
         Q = np.eye(dim_x)
         # TODO remove, just for testing
         Q[0:3] *= varQ_pos
@@ -259,6 +261,7 @@ class KalmanFilter(Estimator):
         return Q
 
     def create_R(self, dim_z: int, varR_pos: float, varR_quat: float, dt: float) -> Array:
+        """TODO."""
         ### Set measurement noise covariance (tunable). Uncertaints in the measurements. High R -> less trust in measurements
         R = np.eye(dim_z)  # Assuming uncorrelated noise
         # very low noise on the position ("mm precision" => even less noise)
@@ -271,9 +274,10 @@ class KalmanFilter(Estimator):
         """Steps the UKF by one. Doing one prediction and correction step.
 
         Args:
-            obs: Latest observation in the form of a dict with "pos" and "rpy"
+            pos: Latest observation of the position
+            quat: Latest observation of the quaternion
             dt: Optional, time step size. If not specified, default time is used
-            u: Optional, latest input to the system
+            command: Optional, latest input to the system
 
         Return:
             New state prediction

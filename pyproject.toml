@@ -51,6 +51,7 @@ exclude = [
     "site-packages",
     "venv",
     "docs/conf.py",
+    "plot.py",
 ]
 
 line-length = 100
