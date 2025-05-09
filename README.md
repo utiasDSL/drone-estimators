@@ -2,6 +2,17 @@
 Drone state estimators @ LSY
 
 
+[![Python Version]][Python Version URL] [![Ruff Check]][Ruff Check URL] [![Tests]][Tests URL]
+
+[Python Version]: https://img.shields.io/badge/python-3.10+-blue.svg
+[Python Version URL]: https://www.python.org
+
+[Ruff Check]: https://github.com/utiasDSL/estimators/actions/workflows/ruff.yml/badge.svg?style=flat-square
+[Ruff Check URL]: https://github.com/utiasDSL/estimators/actions/workflows/ruff.yml
+
+[Tests]: https://github.com/utiasDSL/estimators/actions/workflows/testing.yml/badge.svg
+[Tests URL]: https://github.com/utiasDSL/estimators/actions/workflows/testing.yml
+
 ## Installation
 Clone repository
 
