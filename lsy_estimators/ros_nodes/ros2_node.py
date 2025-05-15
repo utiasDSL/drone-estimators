@@ -35,9 +35,11 @@ import toml
 # Message types: https://docs.ros2.org/foxy/api/geometry_msgs/index-msg.html
 from geometry_msgs.msg import PoseStamped, TwistStamped, WrenchStamped
 from lsy_models.utils import cf2
+from lsy_models.utils import rotation as R
 from munch import Munch, munchify
 from rclpy.qos import QoSHistoryPolicy, QoSProfile, QoSReliabilityPolicy
 from std_msgs.msg import Float64MultiArray
+from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import MarkerArray
 
@@ -295,6 +297,9 @@ class MPEstimator:
         )
         signal.signal(signal.SIGINT, lambda c, _: shutdown.set())  # Gracefully handle Ctrl-C
 
+        last_quat = np.array([0.0, 0.0, 0.0, 1.0])
+        calibration_quat = np.array([0.0, 0.0, 0.0, 1.0])
+
         def tf_callback(msg: TFMessage):
             tf = find_transform(msg.transforms, drone_name)
             if tf is None:
@@ -310,11 +315,14 @@ class MPEstimator:
             # time.
             # TODO: Subtract a constant time to account for [Vicon -> ros2 pub -> ros2 sub] delay.
             time_stamp = time.time()
+            nonlocal last_quat
+            last_quat = quat
+            quat_corrected = R.quat_mult(calibration_quat, quat)  # TODO
             with _tf_msg_buffer.get_lock():
                 _tf_msg_buffer[0] += 1
                 _tf_msg_buffer[1] = time_stamp
                 _tf_msg_buffer[2:5] = pos
-                _tf_msg_buffer[5:9] = quat
+                _tf_msg_buffer[5:9] = quat_corrected
 
         def cmd_callback(msg: Float64MultiArray):
             # The command is as it is sent to the drone, meaning for attitude interface:
@@ -324,6 +332,24 @@ class MPEstimator:
                 _cmd_msg_buffer[1] = time.time()
                 _cmd_msg_buffer[2:] = msg.data
 
+        def calibration_callback(
+            request: Trigger.Request, response: Trigger.Response
+        ) -> Trigger.Response:
+            rpy = R.from_quat(last_quat).as_euler("xyz", degrees=True)
+            max_angle = 20  # degrees
+            if np.any(rpy > max_angle):
+                node.get_logger().warning("Calibration failed.")
+                response.success = False
+                response.message = "Pose could not be calibrated, deck tilted too much."
+                return response
+
+            node.get_logger().warning("Calibration successful.")
+            nonlocal calibration_quat
+            calibration_quat = R.quat_conj(last_quat)
+            response.success = True
+            response.message = "Pose calibrated successfully."
+            return response
+
         sub_tf = node.create_subscription(TFMessage, "/tf", tf_callback, qos_profile=qos_profile)
         sub_cmd = node.create_subscription(
             Float64MultiArray,
@@ -331,12 +357,16 @@ class MPEstimator:
             cmd_callback,
             qos_profile=qos_profile,
         )
+        sub_calib = node.create_service(
+            Trigger, f"/drones/{drone_name}/calibration", calibration_callback
+        )
         startup.wait(10.0)  # Register this process as ready for startup barrier
 
         while not shutdown.is_set():
             rclpy.spin_once(node, timeout_sec=0.1)
         sub_tf.destroy()
         sub_cmd.destroy()
+        sub_calib.destroy()
         node.destroy_node()
 
     @staticmethod
