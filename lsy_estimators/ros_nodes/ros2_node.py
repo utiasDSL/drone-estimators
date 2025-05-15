@@ -213,7 +213,11 @@ class MPEstimator:
                 with self._cmd_msg_buffer.get_lock():
                     data = np.asarray(self._cmd_msg_buffer, dtype=np.float64, copy=True)
                     self._cmd_msg_buffer[0] = 0
-                n_cmd_messages, _, cmd = data[0], data[1], data[2:]
+                n_cmd_messages, cmd_timestep, cmd = data[0], data[1], data[2:]
+
+                if cmd_timestep < tf_timestamp - 1 and cmd_timestep > 0 and self.input_needed:
+                    self.logger.warning("Last command is older than 1s. Assuming zeros as input.")
+                    self.estimator.set_input(np.array([0, 0, 0, 0]))
 
                 if n_cmd_messages >= 1 and self.input_needed:
                     # The command is as it is sent to the drone, meaning for attitude interface:
