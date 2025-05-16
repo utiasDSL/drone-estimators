@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 # motion_capture_tracking, but in case the estimators get started first, we
 # get consistent behavior.
 # Note: All ros nodes started after this line will also only publish locally!
+# Identical console command: ROS_AUTOMATIC_DISCOVERY_RANGE="LOCALHOST"
 os.environ["ROS_AUTOMATIC_DISCOVERY_RANGE"] = "LOCALHOST"
 
 import numpy as np
