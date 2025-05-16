@@ -158,8 +158,8 @@ class KalmanFilter(Estimator):
         varR_pos: float,
         varR_quat: float,
         dt: float,
-        varQ_forces_dist: float = 1e-9,
-        varQ_torques_dist: float = 1e-12,
+        varQ_forces_dist: float = 1e-11,
+        varQ_torques_dist: float = 1e-18,  # TODO dist torque very noisy
     ) -> tuple[Array, Array]:
         """Creates sophisticated covariance matrices based on a paper.
 
@@ -201,8 +201,8 @@ class KalmanFilter(Estimator):
             Q_forces = Q_discrete_white_noise(
                 dim=2, dt=dt, var=varQ_forces_motor, block_size=1, order_by_dim=False
             )  # Motor Forces
-            Q[i : i + 2, i : i + 2] = np.eye(2) * Q_forces[1, 1]  # forces 1&2
-            Q[i + 2 : i + 4, i + 2 : i + 4] = np.eye(2) * Q_forces[1, 1]  # forces 3&4
+            Q[i : i + 2, i : i + 2] = np.eye(2) * Q_forces[0, 0]  # forces 1&2
+            Q[i + 2 : i + 4, i + 2 : i + 4] = np.eye(2) * Q_forces[0, 0]  # forces 3&4
             Q[7:10, i : i + 4] = Q_forces[0, 1]  # forces <-> vel
             Q[i : i + 4, 7:10] = Q_forces[1, 0]  # forces <-> vel
             Q[10:13, i : i + 4] = (
