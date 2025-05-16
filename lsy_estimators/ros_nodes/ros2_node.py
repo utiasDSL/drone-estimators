@@ -191,6 +191,8 @@ class MPEstimator:
                 self.logger.info("Initialized pos and quat.")
                 break
 
+            time.sleep(0.5)
+
         self.logger.info(f"Started estimator (process {os.getpid()})")
 
     def run(self):
