@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from scipy.signal import bilinear, butter, lfilter, lfiltic, savgol_filter
+from scipy.signal import bilinear, butter, correlate, lfilter, lfiltic, savgol_filter
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -812,6 +812,22 @@ def cov2array(data: dict[str, list]) -> dict[str, NDArray]:
         data["covariance"] = np.diagonal(data["covariance"], axis1=-2, axis2=-1)
     return data
 
+def get_alignment_shift(reference, trajectory):
+    """
+    Computes the shift index needed to align `trajectory` to `reference`.
+
+    Parameters:
+    - reference: np.array, the reference signal
+    - trajectory: np.array, the signal to align
+
+    Returns:
+    - shift: int, number of indices to shift `trajectory` to align with `reference`
+    """
+    corr = correlate(trajectory, reference, mode='full')
+    lag = np.argmax(corr) - (len(reference) - 1)
+    return lag  # Negative because np.roll(trajectory, -lag) aligns it to reference
+
+
 
 def quat2rpy(data: dict[str, NDArray]) -> dict[str, NDArray]:
     """Converts the orientation in the data to euler angles."""
@@ -884,8 +900,8 @@ if __name__ == "__main__":
     drone_name = "cf52"
     estimator_types = [
         # "legacy",
-        "ukf_fitted_DI_rpyt",
-        # "ukf_fitted_DI_D_rpyt",
+        # "ukf_fitted_DI_rpyt",
+        "ukf_fitted_DI_D_rpyt",
         "ukf_fitted_DI_DD_rpyt",
         # "ukf_mellinger_rpyt",
     ]
@@ -908,6 +924,12 @@ if __name__ == "__main__":
             data_est = quat2rpy(data_est)
             data_est = cov2array(data_est)
             data_est["time"] -= data_est["time"][0]
+            lag = get_alignment_shift(data_meas["pos"][:,0],data_est["pos"][:,0])
+            # print(f"{lag=}")
+            # print(f"{data_est['time'][lag]=}")
+            # data_est["time"] -= data_est["time"][lag]-0.85
+            data_est["time"] -= np.mean(np.diff(data_est["time"]))*lag-0.85 
+            # TODO figure out why there is a magic number and remove it!
             estimator_datasets.append(data_est)
 
     plots(data_meas, estimator_types, estimator_datasets, animate=False, order="", weight=0)
