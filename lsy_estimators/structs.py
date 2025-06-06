@@ -73,6 +73,7 @@ class UKFData:
 
         u = np.zeros(dim_u)  # input
         z = np.zeros(dim_z)  # measurement
+        z[6] = 1.0  # No zero norm quaternion
         dt = 1
 
         return cls(

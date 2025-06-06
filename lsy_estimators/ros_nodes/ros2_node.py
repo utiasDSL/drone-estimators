@@ -47,6 +47,7 @@ from visualization_msgs.msg import MarkerArray
 from lsy_estimators.estimator import KalmanFilter
 from lsy_estimators.estimator_legacy import StateEstimator
 from lsy_estimators.ros_nodes.ros2_utils import (
+    append_cmd,
     append_measurement,
     append_state,
     create_array,
@@ -140,6 +141,8 @@ class MPEstimator:
         self.settings = settings
         self.time_stamp_last_prediction = 0
         self.time_stamp_last_correction = 0
+        self.last_measurement = np.array([0, 0, 0, 0, 0, 0, 1])
+        self.filtered_ang_vel = 0
         self.perf_timings = deque(maxlen=5000)
 
         self.frequency = settings.frequency  # Hz # TODO get from vicon frequency
@@ -150,6 +153,7 @@ class MPEstimator:
         # This is for storing the data (DEBUG_SAVE_DATA)
         self.data_meas = defaultdict(list)  # {"time": [], "pos": [], "quat": [], "command": []}
         self.data_est = defaultdict(list)
+        self.data_cmd = defaultdict(list)
 
         match self.settings.estimator_type:
             case "legacy":
@@ -180,6 +184,7 @@ class MPEstimator:
         # Initialization
         self.logger.info("Waiting for initial measurement.")
         while not self._shutdown.is_set():
+            time.sleep(0.1)
             with self._tf_msg_buffer.get_lock():
                 data = np.asarray(self._tf_msg_buffer, dtype=np.float64, copy=True)
                 self._tf_msg_buffer[0] = 0
@@ -192,8 +197,6 @@ class MPEstimator:
                 self.logger.info("Initialized pos and quat.")
                 break
 
-            time.sleep(0.5)
-
         self.logger.info(f"Started estimator (process {os.getpid()})")
 
     def run(self):
@@ -201,7 +204,7 @@ class MPEstimator:
         # TODO if first measurement => init estimator
         # self.estimator_init = False
         k = 0
-        global_time = time.perf_counter()
+        start_time = time.time()
 
         try:
             # self.logger.info(f"{self.estimator.data.pos=}")
@@ -216,9 +219,9 @@ class MPEstimator:
                 with self._cmd_msg_buffer.get_lock():
                     data = np.asarray(self._cmd_msg_buffer, dtype=np.float64, copy=True)
                     self._cmd_msg_buffer[0] = 0
-                n_cmd_messages, cmd_timestep, cmd = data[0], data[1], data[2:]
+                n_cmd_messages, cmd_timestamp, cmd = data[0], data[1], data[2:]
 
-                if cmd_timestep < tf_timestamp - 1 and cmd_timestep > 0 and self.input_needed:
+                if cmd_timestamp < tf_timestamp - 1 and cmd_timestamp > 0 and self.input_needed:
                     self.logger.warning("Last command is older than 1s. Assuming zeros as input.")
                     self.estimator.set_input(np.array([0, 0, 0, 0]))
 
@@ -227,22 +230,48 @@ class MPEstimator:
                     # roll (deg), pitch (deg), yaw (deg), thrust (PWM)
                     # All the models run with rad and N, so we need to convert the RPYT command
                     cmd[..., -1] = cf2.pwm2force(cmd[..., -1], self.estimator.constants)
-                    cmd[..., :-1] = np.deg2rad(cmd[..., :-1])
+                    cmd[..., :-1] = np.deg2rad(cmd[..., :-1])  # * 2  # TODO remove later
                     self.estimator.set_input(cmd)  # TODO # compare times?
 
                 if n_tf_msg > 2:
                     self.logger.warning("Dropping tf messages because estimator loop can't keep up")
                     # TODO check for frequencies. If Vicon is running at higher frequency, of course estimator cant keep up
 
+                # Prediction up to measurement, correction with measurement
                 if n_tf_msg >= 1:
                     dt = tf_timestamp - self.time_stamp_last_prediction
                     self.time_stamp_last_prediction = tf_timestamp
-
                     self.estimator.predict(dt)
-                    self.estimator.correct(pos, quat)
+
+                    # Calculate finite differences
+                    dt = tf_timestamp - self.time_stamp_last_correction
+                    if dt > 1e-1 or tf_timestamp - start_time < 1:
+                        vel = np.zeros(3)
+                        self.filtered_ang_vel = np.zeros(3)
+                    else:
+                        vel = (pos - self.last_measurement[0:3]) / dt
+                        ang_vel = (
+                            R.from_quat(quat) * R.from_quat(self.last_measurement[3:7]).inv()
+                        ).as_rotvec() / dt
+                        # quat_dot = (quat - self.estimator.data.z[3:7]) / dt
+                        # ang_vel = (
+                        #     2 * (R.from_quat(quat) * R.from_quat(quat_dot).inv()).as_quat()[:3]
+                        # )
+
+                        tau = 0.1
+                        alpha = dt / (tau + dt)
+                        self.filtered_ang_vel = (
+                            alpha * ang_vel + (1 - alpha) * self.filtered_ang_vel
+                        )
+                        # print(f"{self.filtered_ang_vel=}")
+
+                    self.time_stamp_last_correction = tf_timestamp
+                    self.last_measurement = np.concatenate((pos, quat))
+                    self.estimator.correct(pos, quat, vel, self.filtered_ang_vel)
 
                     # estimator_data = self.estimator.step(pos, quat, dt)
 
+                # Prediction up to current time
                 time_stamp_now = time.time()
                 dt = time_stamp_now - self.time_stamp_last_prediction
                 self.time_stamp_last_prediction = time_stamp_now
@@ -268,10 +297,12 @@ class MPEstimator:
                 if self.settings.save_data:
                     append_state(self.data_est, time_stamp_now, estimator_data)
                     if n_tf_msg >= 1:
-                        if n_cmd_messages >= 1 and self.input_needed:
-                            append_measurement(self.data_meas, tf_timestamp, pos, quat, cmd)
-                        if not self.input_needed:
-                            append_measurement(self.data_meas, tf_timestamp, pos, quat, None)
+                        append_measurement(self.data_meas, tf_timestamp, pos, quat)
+                    if n_cmd_messages >= 1:
+                        if self.input_needed:  # n_cmd_messages >= 1 and
+                            append_cmd(self.data_cmd, cmd_timestamp, cmd)
+                        else:
+                            append_cmd(self.data_cmd, cmd_timestamp, None)
 
                 # if k % 100 == 0:
                 #     self.logger.info(f"{estimator_data.forces_dist=}")
@@ -280,7 +311,7 @@ class MPEstimator:
                     (1 / self.frequency) - (time.time() - loop_start_time) - 1.25 * 1e-4
                 )  # TODO remove magic number, replace with "controller"
                 if k % 1000 == 999:
-                    self.logger.info(f"Freq: {k / (time.perf_counter() - global_time)}")
+                    self.logger.info(f"Freq: {k / (time.time() - start_time)}")
                 k += 1
                 if remaining > 0:
                     time.sleep(remaining)
@@ -477,6 +508,8 @@ class MPEstimator:
                 pickle.dump(self.data_est, f)
             with open(filename + "measurement" + ".pkl", "wb") as f:
                 pickle.dump(self.data_meas, f)
+            with open(filename + "command" + ".pkl", "wb") as f:
+                pickle.dump(self.data_cmd, f)
 
 
 def launch_estimators(estimators: dict):

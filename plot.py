@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from scipy.signal import bilinear, butter, correlate, lfilter, lfiltic, savgol_filter
+from scipy.signal import bilinear, butter, lfilter, lfiltic, savgol_filter
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -132,7 +132,7 @@ def setaxs2(axs2, t_start, t_end):
     axs2[0, 1].set_title("Euler Angle Error roll [degree]")
     axs2[1, 1].set_title("Euler Angle Error pitch [degree]")
     axs2[2, 1].set_title("Euler Angle Error yaw [degree]")
-    err_rpy = 1e-0
+    err_rpy = 0.1
     axs2[0, 1].set_ylim(-err_rpy, err_rpy)
     axs2[1, 1].set_ylim(-err_rpy, err_rpy)
     axs2[2, 1].set_ylim(-err_rpy, err_rpy)
@@ -649,7 +649,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     data_SVF["acc"] = svf_linear[:, 2].T
     data_SVF["jerk"] = svf_linear[:, 3].T
 
-    svf_rotational = state_variable_filter(data_meas["rpy"].T, data_meas["time"], f_c=8, N_deriv=3)
+    svf_rotational = state_variable_filter(data_meas["rpy"].T, data_meas["time"], f_c=4, N_deriv=3)
     data_SVF["rpy"] = svf_rotational[:, 0].T
     data_SVF["drpy"] = svf_rotational[:, 1].T
     data_SVF["ddrpy"] = svf_rotational[:, 2].T
@@ -657,14 +657,34 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     rot = R.from_euler("xyz", data_SVF["rpy"])
     data_SVF["quat"] = rot.as_quat()
     data_SVF["ang_vel"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["drpy"])
-    data_SVF["ang_acc"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["ddrpy"])
+    data_SVF["ang_acc"] = R.rpy_rates_deriv2ang_vel_deriv(data_SVF["quat"], data_SVF["drpy"], data_SVF["ddrpy"])
     data_SVF["ang_jerk"] = R.rpy_rates2ang_vel(data_SVF["quat"], data_SVF["dddrpy"])
 
-    svf_input_rpy = state_variable_filter(
-        data_meas["command"][..., :-1].T, data_meas["time"], f_c=8, N_deriv=3
+    svf_input = state_variable_filter(
+        data_cmd["command"].T, data_cmd["time"], f_c=8, N_deriv=3
     )
-    data_SVF["cmd_rpy"] = svf_input_rpy[:, 0].T
-    #
+    interpolation = interp1d(data_cmd["time"], svf_input[:, 0].T, kind="linear", axis=0, fill_value=[0.0]*4, bounds_error=False)
+
+    data_SVF["cmd_rpy"] = interpolation(data_meas["time"])[..., :3]
+
+    data_test = defaultdict(list)
+    # data_test["time"] = data_SVF["time"].copy()
+    # data_test["quat"] = data_SVF["quat"].copy()
+    # data_test["ang_vel"] = data_SVF["ang_vel"].copy()
+    data_test["time"] = estimator_datasets[-1]["time"].copy()
+    data_test["quat"] = estimator_datasets[-1]["quat"].copy()
+    data_test["ang_vel"] = estimator_datasets[-1]["ang_vel"].copy()
+    dt = np.diff(data_test["time"])
+    # data_test["ang_vel"] += np.random.normal(0, 0.01, size= data_test["ang_vel"].shape)
+    # Manual integration
+    for i in range(1, len(data_test["time"])):
+        quat = data_test["quat"][i - 1]
+        ang_vel = data_test["ang_vel"][i - 1]
+        next_quat = (R.from_quat(quat) * R.from_rotvec(ang_vel * dt[i-1])).as_quat()
+        data_test["quat"][i] = next_quat
+    data_test["rpy"] = R.from_quat(data_test["quat"]).as_euler("xyz", degrees=False)
+    data_test["drpy"] = R.ang_vel2rpy_rates(data_test["quat"], data_test["ang_vel"])
+
 
     # estimator_datasets[0]["ang_vel"]
 
@@ -718,10 +738,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     ### Plotting
     ##################################################
     colors = list(mcolors.TABLEAU_COLORS.values())
-    # First, plot measurements
-    plotaxs1(axs1, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
-    plotaxs2(axs2, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
-    # plotaxs3(axs3, data_meas, label="meas", linestyle="--", color="tab:blue")
+    plotaxs2(axs2, data_test, label="meas (SV filtered + integrated)", color=colors[-1])
 
     for i in range(len(estimator_types)):
         name = estimator_types[i]
@@ -730,6 +747,11 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
         plotaxs1(axs1, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
         plotaxs2(axs2, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
         plotaxs3(axs3, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
+
+    # Plot measurements
+    plotaxs1(axs1, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
+    plotaxs2(axs2, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
+    # plotaxs3(axs3, data_meas, label="meas", linestyle="--", color="tab:blue")
 
     # TODO axis title, grid, legend etc
     setaxs1(axs1, data_meas["time"][0], data_meas["time"][-1])
@@ -812,21 +834,13 @@ def cov2array(data: dict[str, list]) -> dict[str, NDArray]:
         data["covariance"] = np.diagonal(data["covariance"], axis1=-2, axis2=-1)
     return data
 
-def get_alignment_shift(reference, trajectory):
-    """
-    Computes the shift index needed to align `trajectory` to `reference`.
 
-    Parameters:
-    - reference: np.array, the reference signal
-    - trajectory: np.array, the signal to align
-
-    Returns:
-    - shift: int, number of indices to shift `trajectory` to align with `reference`
-    """
-    corr = correlate(trajectory, reference, mode='full')
-    lag = np.argmax(corr) - (len(reference) - 1)
-    return lag  # Negative because np.roll(trajectory, -lag) aligns it to reference
-
+def get_alignment_shift(trajectory1, trajectory2, times1, times2):
+    """Calculates the time shift to align trajectory 2 with trajectory 1."""
+    trajectory2_interp = interp1d(times2, trajectory2, kind='linear', axis=0, fill_value=0, bounds_error=False)(times1)
+    corr = np.correlate(trajectory1, trajectory2_interp, mode='full')
+    lag = np.argmax(corr) - (len(trajectory1) - 1)
+    return np.sign(lag)*times1[np.abs(lag)]
 
 
 def quat2rpy(data: dict[str, NDArray]) -> dict[str, NDArray]:
@@ -899,14 +913,15 @@ def rmse(error_array: NDArray) -> np.floating:
 if __name__ == "__main__":
     drone_name = "cf52"
     estimator_types = [
-        # "legacy",
+        "legacy",
         # "ukf_fitted_DI_rpyt",
-        "ukf_fitted_DI_D_rpyt",
+        # "ukf_fitted_DI_D_rpyt",
         "ukf_fitted_DI_DD_rpyt",
         # "ukf_mellinger_rpyt",
     ]
     estimator_datasets = []
 
+    # Load measurement dataset
     path = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(path, f"data_{drone_name}_measurement.pkl"), "rb") as f:
         data_meas = pickle.load(f)
@@ -916,6 +931,12 @@ if __name__ == "__main__":
     start_time = data_meas["time"][0]
     data_meas["time"] -= start_time
 
+    # Load command dataset
+    with open(os.path.join(path, f"data_{drone_name}_command.pkl"), "rb") as f:
+        data_cmd = pickle.load(f)
+        data_cmd = list2array(data_cmd)
+        data_cmd["time"] -= start_time
+
     # Load all estimator datasets
     for estimator_type in estimator_types:
         with open(os.path.join(path, f"data_{drone_name}_{estimator_type}.pkl"), "rb") as f:
@@ -923,12 +944,15 @@ if __name__ == "__main__":
             data_est = list2array(data_est)
             data_est = quat2rpy(data_est)
             data_est = cov2array(data_est)
+            # data_est["time"] -= start_time
             data_est["time"] -= data_est["time"][0]
-            lag = get_alignment_shift(data_meas["pos"][:,0],data_est["pos"][:,0])
+
+            lag = get_alignment_shift(data_meas["pos"][:,0],data_est["pos"][:,0], data_meas["time"], data_est["time"])
+            data_est["time"] += lag
             # print(f"{lag=}")
             # print(f"{data_est['time'][lag]=}")
             # data_est["time"] -= data_est["time"][lag]-0.85
-            data_est["time"] -= np.mean(np.diff(data_est["time"]))*lag-0.85 
+            # data_est["time"] -= np.mean(np.diff(data_est["time"]))*lag-0.85 
             # TODO figure out why there is a magic number and remove it!
             estimator_datasets.append(data_est)
 

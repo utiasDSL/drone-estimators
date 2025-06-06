@@ -267,13 +267,16 @@ def append_state(data: defaultdict[str, list], time: float, state: UKFData):
         data["torques_dist"] = []
 
 
-def append_measurement(
-    data: defaultdict[str, list], time: float, pos: Array, quat: Array, command: Array | None = None
-):
+def append_measurement(data: defaultdict[str, list], time: float, pos: Array, quat: Array):
     """Appends each measurment data to the corresponding of list in the dictionary."""
     data["time"].append(time)
     data["pos"].append(pos)
     data["quat"].append(quat)
+
+
+def append_cmd(data: defaultdict[str, list], time: float, command: Array | None = None):
+    """Appends each command data to the corresponding of list in the dictionary."""
+    data["time"].append(time)
     if command is None:
-        command = np.zeros_like(quat)
+        command = np.zeros(4)
     data["command"].append(command)

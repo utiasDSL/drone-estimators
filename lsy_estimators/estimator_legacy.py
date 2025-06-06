@@ -114,7 +114,9 @@ class StateEstimator(object):
             self.pos, np.array(np.roll(self.quat, -1)).astype(float), self.vel, self.omega_b
         )
 
-    def correct(self, pos: Array, quat: Array, command: Array | None = None) -> UKFData:
+    def correct(
+        self, pos: Array, quat: Array, vel: Array, ang_vel: Array, command: Array | None = None
+    ) -> UKFData:
         """This function is not part of the legacy estimator and only for compatability."""
         # Since the legacy estimator doesn't inherently support the prediction/correction
         # form of a Kalman filter, we only step the time in the prediction step. In the

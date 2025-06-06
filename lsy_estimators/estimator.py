@@ -6,7 +6,11 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 import numpy as np
-from lsy_models.models import dynamics_numeric, observation_function
+from lsy_models.models import (
+    dynamics_numeric,
+    observation_function_pose,
+    observation_function_pose_twist,
+)
 from lsy_models.utils.constants import Constants
 
 from lsy_estimators.filterpy import (
@@ -91,7 +95,7 @@ class KalmanFilter(Estimator):
             initial_obs: Optional, the initial observation of the environment's state. See the environment's observation space for details.
         """
         fx = dynamics_numeric(model, config)
-        hx = observation_function
+        hx = observation_function_pose_twist
         # fx = jax.jit(dynamics_numeric(model, config))
         # hx = jax.jit(observation_function)
         self.constants = Constants.from_config(config)
@@ -104,7 +108,7 @@ class KalmanFilter(Estimator):
         if estimate_torques_dist:
             dim_x += 3
         dim_u = 4  # TODO from available models
-        dim_z = 7  # pos, quat
+        dim_z = 13  # 7: pos, quat, or 13: vel, ang_vel
 
         self.data = UKFData.create_empty(
             forces_motor=estimate_forces_motor,
@@ -120,11 +124,13 @@ class KalmanFilter(Estimator):
         Q, R = self.create_covariance_matrices(
             dim_x=dim_x,
             dim_z=dim_z,
-            varQ_pos=1e-6,
-            varQ_quat=1e-2,
+            varQ_pos=1e-9,
+            varQ_quat=1e-9,
             varQ_forces_motor=1e-5,
             varR_pos=1e-9,
-            varR_quat=5e-9,
+            varR_quat=1e-9,
+            varR_vel=1e-7,
+            varR_ang_vel=1e-7,
             dt=dt,
         )
         # Q = self.create_Q(
@@ -158,6 +164,8 @@ class KalmanFilter(Estimator):
         varR_pos: float,
         varR_quat: float,
         dt: float,
+        varR_vel: float = 1e-1,
+        varR_ang_vel: float = 1e-1,
         varQ_forces_dist: float = 1e-11,
         varQ_torques_dist: float = 1e-18,  # TODO dist torque very noisy
     ) -> tuple[Array, Array]:
@@ -188,7 +196,7 @@ class KalmanFilter(Estimator):
         )  # quat & ang_vel
         Q[3:5, 3:5] = Q_rot[0:2, 0:2]  # quat12
         Q[5:7, 5:7] = Q_rot[0:2, 0:2]  # quat34
-        Q[10:13, 10:13] = Q_rot[3:6, 3:6]  # ang_vel
+        Q[10:13, 10:13] = Q_rot[3:6, 3:6] * 1e9  # ang_vel
         # We know that all quat_dot dependent on all ang_vel
         # => fill in the whole 4x3 and 3x4 matrix blocks with the variance
         Q[3:7, 10:13] = Q_rot[0, 3]  # quat <-> ang_vel
@@ -224,51 +232,13 @@ class KalmanFilter(Estimator):
         ### Set measurement noise covariance (tunable). Uncertaints in the measurements. High R -> less trust in measurements
         R = np.eye(dim_z)  # Assuming uncorrelated noise
         # very low noise on the position ("mm precision" => even less noise)
-        R[:3, :3] = R[:3, :3] * varR_pos
+        R[0:3, 0:3] = R[0:3, 0:3] * varR_pos
         # "high" measurements noise on the angles, estimate: 0.01 constains all values => std=3e-3 TODO look at new quat measurements
-        R[3:, 3:] = R[3:, 3:] * varR_quat
+        R[3:7, 3:7] = R[3:7, 3:7] * varR_quat
+        R[7:10, 7:10] = R[7:10, 7:10] * varR_vel
+        R[10:13, 10:13] = R[10:13, 10:13] * varR_ang_vel
 
         return Q, R
-
-    def create_Q(
-        self,
-        dim_x: int,
-        varQ_pos: float,
-        varQ_quat: float,
-        varQ_vel: float,
-        varQ_ang_vel: float,
-        dt: float,
-        varQ_forces_motor: float = 1e-1,
-        varQ_forces_dist: float = 1e-9,
-        varQ_torques_dist: float = 1e-12,
-    ) -> Array:
-        """TODO."""
-        Q = np.eye(dim_x)
-        # TODO remove, just for testing
-        Q[0:3] *= varQ_pos
-        Q[3:7] *= varQ_quat
-        Q[7:10] *= varQ_vel
-        Q[10:13] *= varQ_ang_vel
-        i = 13
-        if self.data.forces_motor is not None:
-            Q[i : i + 4] *= varQ_forces_motor
-            i = i + 4
-        if self.data.forces_dist is not None:
-            Q[i : i + 3, i : i + 3] *= varQ_forces_dist  # Force
-            i = i + 3
-        if self.data.torques_dist is not None:
-            Q[i : i + 3, i : i + 3] *= varQ_torques_dist  # Torque
-        return Q
-
-    def create_R(self, dim_z: int, varR_pos: float, varR_quat: float, dt: float) -> Array:
-        """TODO."""
-        ### Set measurement noise covariance (tunable). Uncertaints in the measurements. High R -> less trust in measurements
-        R = np.eye(dim_z)  # Assuming uncorrelated noise
-        # very low noise on the position ("mm precision" => even less noise)
-        R[:3, :3] = R[:3, :3] * varR_pos
-        # "high" measurements noise on the angles, estimate: 0.01 constains all values => std=3e-3 TODO look at new quat measurements
-        R[3:, 3:] = R[3:, 3:] * varR_quat
-        return R
 
     def step(self, pos: Array, quat: Array, dt: float, command: Array | None = None) -> UKFData:
         """Steps the UKF by one. Doing one prediction and correction step.
@@ -319,17 +289,16 @@ class KalmanFilter(Estimator):
 
         return self.data
 
-    def correct(self, pos: Array, quat: Array, command: Array | None = None) -> UKFData:
+    def correct(
+        self, pos: Array, quat: Array, vel: Array, ang_vel: Array, command: Array | None = None
+    ) -> UKFData:
         """TODO."""
         # Update the input
         if command is not None:
             self.set_input(command)
 
-        # Update observation and dt
-        # dt hast to be vectorized to work properly in jax
-        self.data = self.data.replace(z=np.concat((pos, quat)))
-
-        # print(f"{quat=}, {self.data.quat=}, {self.data.u[-2]=}")
+        # Update observation
+        self.data = self.data.replace(z=np.concat((pos, quat, vel, ang_vel)))
 
         self.data = ukf_correct(self.data, self.settings)
 
