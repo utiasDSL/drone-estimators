@@ -522,6 +522,24 @@ def plotaxs3(
         #     linewidth=1,
         # )  # plotting 3 std
 
+def plotaxs4(axs4, data, label="unknown", linestyle="-", color="tab:blue", alpha=0.0):
+    """Plot motor forces and command force if available."""
+    # Plot command force if present
+    if "cmd_f" in data and len(data["cmd_f"]) > 0:
+        axs4.plot(data["time"], data["cmd_f"], label=f"{label} cmd_f", color=color, linestyle="--")
+    # Plot motor forces if present
+    if "forces_motor" in data and len(data["forces_motor"]) > 0:
+        # If forces_motor is 2D (N, n_motors), plot each motor
+        n_motors = data["forces_motor"].shape[1] if data["forces_motor"].ndim > 1 else 1
+        force = np.sum(data["forces_motor"], axis=-1) if n_motors > 1 else data["forces_motor"]
+        axs4.plot(
+            data["time"],
+            force,
+            label=label,
+            linestyle=linestyle,
+            color=color,
+            alpha=alpha,
+        )
 
 def plotaxs3single(axs3, alpha, data, t_vertical=None, order="", weight=0, t_start=0, t_end=10):
     ### force and torque
@@ -599,6 +617,8 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     # fig3, axs3 = plt.subplots(3, 2, figsize=figsize) # force and torque
     # fig3, axs3 = plt.subplots(1, figsize=figsize)  # force and torque
     fig3.tight_layout(pad=pad)
+    fig4, axs4 = plt.subplots(1, figsize=figsize)  # thrust
+    fig4.tight_layout(pad=pad)
 
     # axs3.tick_params(axis="both", which="major", labelsize=12)
     # axs3.tick_params(axis="both", which="minor", labelsize=10)
@@ -666,6 +686,7 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
     interpolation = interp1d(data_cmd["time"], svf_input[:, 0].T, kind="linear", axis=0, fill_value=[0.0]*4, bounds_error=False)
 
     data_SVF["cmd_rpy"] = interpolation(data_meas["time"])[..., :3]
+    data_SVF["cmd_f"] = interpolation(data_meas["time"])[..., 3]
 
     data_test = defaultdict(list)
     # data_test["time"] = data_SVF["time"].copy()
@@ -747,16 +768,24 @@ def plots(data_meas, estimator_types, estimator_datasets, animate=False, order="
         plotaxs1(axs1, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
         plotaxs2(axs2, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
         plotaxs3(axs3, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
+        plotaxs4(axs4, data, label=name, linestyle="-", color=colors[i + 1], alpha=alpha)
 
     # Plot measurements
     plotaxs1(axs1, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
     plotaxs2(axs2, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
     # plotaxs3(axs3, data_meas, label="meas", linestyle="--", color="tab:blue")
+    plotaxs4(axs4, data_SVF, label="meas (SV filtered)", linestyle="--", color=colors[0])
 
     # TODO axis title, grid, legend etc
     setaxs1(axs1, data_meas["time"][0], data_meas["time"][-1])
     setaxs2(axs2, data_meas["time"][0], data_meas["time"][-1])
     setaxs3(axs3, data_meas["time"][0], data_meas["time"][-1])
+
+    axs4.set_title("Motor Forces")
+    axs4.set_xlabel("Time [s]")
+    axs4.set_ylabel("Force [N]")
+    axs4.legend()
+    axs4.grid()
 
     # plotaxs1(axs1, alpha, data, t_vertical=None, order="", weight=0, t_start=0, t_end=50)
     # plotaxs2(axs2, alpha, data, t_vertical=None, order="", weight=0, t_start=0, t_end=50)
