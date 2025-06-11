@@ -1,27 +1,40 @@
-# Simly add your estimators as shown below
-
-# Supported types: legacy, ukf
-# Supported models: See lsy_models.models.available_models, i.e. fitted_DI_rpy, mellinger_rpyt
-
-[global] # TODO rename to global
-frequency = 300   # frequency of the estimator. This should be >= Vicon frequency
-timings = true    # print the timings of each estimator
+[global] # global settings; can be overwritten on estimator level by adding the same field to the estimator config
+frequency = 300   # frequency of the estimator. This should be > Vicon frequency
+timings = true    # print the timings/frequency of each estimator
 save_data = false # store the raw data and estimates into pickle files
+# default settings
+drone_config = "cf2x_L250"              # setup of the drone (model, battery, propellers, motors,...)
+estimator_type = "legacy"               # what estimator to use
+dynamics_model = "fitted_DI_rpyt"       # what model to use (in model based estimators)
+estimate_forces_motor = false           # should the motor dynamics be estimated
+estimate_forces_dist = false            # should the disturbance forces be estimated
+estimate_forces_dist_fxtdo = false      # should the disturbance forces be estimated with fxtdo, this overwrites the other force estimate!
+estimate_torques_dist = false           # should the disturbance torques be estimated?
 
-[estimator1]
-estimator_type = "ukf"
-drone_name = "cf52"
-drone_config = "cf2x_L250"
-dynamics_model = "fitted_DI_D_rpyt"
-estimate_forces_motor = true
-estimate_forces_dist = true
-estimate_torques_dist = false
+# Since everything is deactivated by default, the only absolutely necessary value to set is the drone name:
+# [estimator_example1]
+# drone_name = "cf01"
 
-# [estimator2]
+# A more custom setup might look something like:
+# [estimator_example2]
+# drone_name = "cf52"
 # estimator_type = "ukf"
-# drone_name = "cf99"
-# drone_config = "cf2x_L250"
 # dynamics_model = "fitted_DI_DD_rpyt"
 # estimate_forces_motor = true
 # estimate_forces_dist = true
-# estimate_torques_dist = true
+
+#################################################################
+################# Add your estimators below #####################
+#################################################################
+# The field needs to contain the word "estimator"
+# Supported types: legacy, ukf
+# Supported models: See lsy_models.models.available_models, i.e. fitted_DI_rpyt, mellinger_rpyt
+# Supported configs: See lsy_models.data, i.e. cf2x_L250, cf2x_T350
+
+[estimator1]
+drone_name = "cf52"
+estimator_type = "ukf"
+dynamics_model = "fitted_DI_DD_rpyt"
+estimate_forces_motor = true
+estimate_forces_dist = true
+estimate_forces_dist_fxtdo = false

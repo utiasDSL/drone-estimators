@@ -44,7 +44,8 @@ from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from visualization_msgs.msg import MarkerArray
 
-from lsy_estimators.estimator import KalmanFilter
+from lsy_estimators.estimator_fxtdo import FxTDO
+from lsy_estimators.estimator_kalman import KalmanFilter
 from lsy_estimators.estimator_legacy import StateEstimator
 from lsy_estimators.ros_nodes.ros2_utils import (
     append_cmd,
@@ -170,7 +171,7 @@ class MPEstimator:
                 self.input_needed = True
                 self.estimator = KalmanFilter(
                     dt=1 / self.frequency,
-                    model=settings.dynamics_model,  # mellinger_rpyt, fitted_DI_rpy
+                    model=settings.dynamics_model,
                     config=settings.drone_config,
                     estimate_forces_motor=settings.estimate_forces_motor,
                     estimate_forces_dist=settings.estimate_forces_dist,
@@ -180,11 +181,17 @@ class MPEstimator:
                 raise NotImplementedError(
                     f"Estimator type {self.settings.estimator_type} not implemented."
                 )
+        self.fxtdo = FxTDO(
+            dt=1 / self.frequency,
+            model=settings.dynamics_model,
+            config=settings.drone_config,
+            estimate_forces_motor=settings.estimate_forces_motor,
+        )
 
         # Initialization
         self.logger.info("Waiting for initial measurement.")
         while not self._shutdown.is_set():
-            time.sleep(0.1)
+            time.sleep(0.1)  # Prevent busy spinning
             with self._tf_msg_buffer.get_lock():
                 data = np.asarray(self._tf_msg_buffer, dtype=np.float64, copy=True)
                 self._tf_msg_buffer[0] = 0
@@ -232,6 +239,7 @@ class MPEstimator:
                     cmd[..., -1] = cf2.pwm2force(cmd[..., -1], self.estimator.constants)
                     cmd[..., :-1] = np.deg2rad(cmd[..., :-1])  # * 2  # TODO remove later
                     self.estimator.set_input(cmd)  # TODO # compare times?
+                    self.fxtdo.set_input(cmd)
 
                 if n_tf_msg > 2:
                     self.logger.warning("Dropping tf messages because estimator loop can't keep up")
@@ -241,7 +249,9 @@ class MPEstimator:
                 if n_tf_msg >= 1:
                     dt = tf_timestamp - self.time_stamp_last_prediction
                     self.time_stamp_last_prediction = tf_timestamp
-                    self.estimator.predict(dt)
+                    estimator_data = self.estimator.predict(dt)
+                    if self.settings.estimate_forces_dist_fxtdo:
+                        self.fxtdo.step(estimator_data.quat, estimator_data.vel, dt)
 
                     # Calculate finite differences
                     dt = tf_timestamp - self.time_stamp_last_correction
@@ -276,6 +286,8 @@ class MPEstimator:
                 dt = time_stamp_now - self.time_stamp_last_prediction
                 self.time_stamp_last_prediction = time_stamp_now
                 estimator_data = self.estimator.predict(dt)
+                if self.settings.estimate_forces_dist_fxtdo:
+                    f_hat = self.fxtdo.step(estimator_data.quat, estimator_data.vel, dt)
 
                 # Giving new estimate to publisher
                 with self._pose_buffer.get_lock():
@@ -287,7 +299,10 @@ class MPEstimator:
                 if estimator_data.forces_motor is not None:
                     with self._forces_buffer.get_lock():
                         self._forces_buffer[:] = estimator_data.forces_motor
-                if estimator_data.forces_dist is not None:
+                if self.settings.estimate_forces_dist_fxtdo:
+                    with self._forces_buffer.get_lock():
+                        self._wrench_buffer[:3] = f_hat
+                elif estimator_data.forces_dist is not None:
                     with self._wrench_buffer.get_lock():
                         self._wrench_buffer[:3] = estimator_data.forces_dist
                         if estimator_data.torques_dist is not None:
@@ -578,7 +593,7 @@ if __name__ == "__main__":
     with open(path, "r") as f:
         estimators = munchify(toml.load(f))
 
-    # Add debug to each estimator (if not already in place)
+    # Add global to each estimator (if not already in place)
     for key, val in estimators.items():
         if not key.startswith("estimator"):
             continue
