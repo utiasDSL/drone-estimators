@@ -76,7 +76,7 @@ class FxTDO(Estimator):
 
         # State bounds
         self._delta = 0.34  # f_max [N], no stronger force than gravity (~34g)
-        self._delta_bar = 0.001  # f_dot_max [N/s] # TODO tune properly for bound
+        self._delta_bar = 0.001  # f_dot_max [N/s] # TODO tune properly for guarantees
         self._v_max = 5  # [m/s]
         self._v_dot_max = 10  # [m/s/s] (cant really accelerate faster than free fall)
 
@@ -143,10 +143,9 @@ class FxTDO(Estimator):
             and 0 < d_inf < 1
         ):
             # now, more complicated checks, mainly for guarantees
-            # print(f"{L2=} / {f_d_dot_max / k2[0]=}")
             if L2 > f_d_dot_max / k2[0]:
                 return True
-            # TODO X check (see paper)
+            # TODO X check? (see paper)
         else:
             return False
 
@@ -158,37 +157,13 @@ class FxTDO(Estimator):
         self._dt = dt
         e1 = vel - self._vel_hat
 
+        # print(f"###### {quat=}, {vel=}")
+
         # Calculate derivatives
         vel_hat_dot, force_motor_hat_dot = self._fx(
             quat, self._vel_hat, self._forces_motor_hat, self._forces_dist_hat, self._input
         )
-        if self._forces_motor_hat is not None:
-            f_t = np.sum(self._forces_motor_hat, axis=-1)
-        else:
-            f_t = self._input[-1]
-        # print(f"{f_t=}")
-        z_axis = R.from_quat(quat).as_matrix()[..., -1]
-        print(f"fx {vel_hat_dot=}")
-        print(f"{z_axis=}")
-        vel_hat_dot = (
-            1 / self._constants.MASS * z_axis * f_t
-            + self._constants.GRAVITY_VEC
-            + 1 / self._constants.MASS * self._constants.DI_DD_ACC[2] * self._vel_hat
-            + 1
-            / self._constants.MASS
-            * self._constants.DI_DD_ACC[3]
-            * self._vel_hat
-            * np.abs(self._vel_hat)
-            + 1 / self._constants.MASS * self._forces_dist_hat
-            + 1 / self._constants.MASS * self._L1 * self._phi1(e1)
-        )
-        print(f"{vel_hat_dot=}")
-        if self._forces_motor_hat is not None:
-            force_motor_hat_dot = (
-                1
-                / self._constants.DI_D_ACC[2]
-                * (self._input[-1][..., None] / 4 - self._forces_motor_hat)
-            )
+        vel_hat_dot += 1 / self._constants.MASS * self._L1 * self._phi1(e1)
         forces_dist_hat_dot = self._L2 * self._phi2(e1)
         # v_hat_dot = np.clip(v_hat_dot, -self._v_dot_max, self._v_dot_max)  # Clipping
         # f_hat_dot = np.clip(f_hat_dot, -self._delta_bar, self._delta_bar)  # Clipping
@@ -201,11 +176,6 @@ class FxTDO(Estimator):
         # v_hat = np.clip(v_hat, -self._v_max, self._v_max)  # Clipping
         # f_hat = np.clip(f_hat, -self._delta, self._delta)  # Clipping
 
-        # Storing in the state
-        self._state[:3] = self._vel_hat
-        self._state[3:] = self._forces_dist_hat
-
-        # return self._state
         return self._forces_dist_hat
 
     def _phi1(self, e: np.floating) -> np.floating:
