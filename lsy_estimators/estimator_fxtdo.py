@@ -72,7 +72,7 @@ class FxTDO(Estimator):
 
         # Initialize states
         if initial_obs is not None:
-            self._vel = initial_obs["vel"]
+            self._vel_hat = initial_obs["vel"]
 
         # State bounds
         self._delta = 0.34  # f_max [N], no stronger force than gravity (~34g)
