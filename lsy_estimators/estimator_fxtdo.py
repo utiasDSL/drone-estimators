@@ -75,8 +75,8 @@ class FxTDO(Estimator):
             self._vel_hat = initial_obs["vel"]
 
         # State bounds
-        self._delta = 0.34  # f_max [N], no stronger force than gravity (~34g)
-        self._delta_bar = 0.001  # f_dot_max [N/s] # TODO tune properly for guarantees
+        self._delta = 0.1  # f_max [N], no stronger force than gravity (~34g), max load is ~10g
+        self._delta_bar = 0.4  # f_dot_max [N/s], from data
         self._v_max = 5  # [m/s]
         self._v_dot_max = 10  # [m/s/s] (cant really accelerate faster than free fall)
 
@@ -85,7 +85,7 @@ class FxTDO(Estimator):
         # https://arxiv.org/html/2408.15019v2
         # Hyperparameters:
         self._L1 = 0.1  # Paper: 1.0, observer gain for the observer states
-        self._L2 = 0.15  # Paper: 1.0, observer gain for (linear) convergence speed of f_hat_dot, L2 > delta_bar / k2[0]
+        self._L2 = 0.25  # Paper: 1.0, observer gain for (linear) convergence speed of f_hat_dot, L2 > delta_bar / k2[0]
         self._k1 = np.array([2.0, 0.6, 3.0])  # Paper: [2.0, 0.6, 3.0]
         self._k2 = np.array([2.0, 30.6, 300.0])  # Paper: [2.0, 0.6, 3.0]
         self._d_inf = 0.3  # Paper: 1/3

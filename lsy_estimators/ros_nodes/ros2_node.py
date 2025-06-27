@@ -187,6 +187,7 @@ class MPEstimator:
             config=settings.drone_config,
             estimate_forces_motor=settings.estimate_forces_motor,
         )
+        self._forces_dist = np.zeros(3)
 
         # Initialization
         self.logger.info("Waiting for initial measurement.")
@@ -286,8 +287,12 @@ class MPEstimator:
                 dt = time_stamp_now - self.time_stamp_last_prediction
                 self.time_stamp_last_prediction = time_stamp_now
                 estimator_data = self.estimator.predict(dt)
-                if self.settings.estimate_forces_dist_fxtdo:
-                    f_hat = self.fxtdo.step(estimator_data.quat, estimator_data.vel, dt)
+                if self.settings.estimate_forces_dist_fxtdo:  # TODO properly document this
+                    alpha = 0.1
+                    self._forces_dist = (
+                        alpha * self.fxtdo.step(estimator_data.quat, estimator_data.vel, dt)
+                        + (1 - alpha) * self._forces_dist
+                    )
 
                 # Giving new estimate to publisher
                 with self._pose_buffer.get_lock():
@@ -301,7 +306,7 @@ class MPEstimator:
                         self._forces_buffer[:] = estimator_data.forces_motor
                 if self.settings.estimate_forces_dist_fxtdo:
                     with self._forces_buffer.get_lock():
-                        self._wrench_buffer[:3] = f_hat
+                        self._wrench_buffer[:3] = self._forces_dist
                 elif estimator_data.forces_dist is not None:
                     with self._wrench_buffer.get_lock():
                         self._wrench_buffer[:3] = estimator_data.forces_dist
