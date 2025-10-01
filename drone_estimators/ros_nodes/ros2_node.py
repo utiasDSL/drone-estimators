@@ -548,11 +548,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--settings", default="ros_nodes/estimators.toml", help="Path to Settings file"
     )
+    parser.add_argument(
+        "--drone_name", default="cf52", help="Specify which drone is flying"
+    )
     args = parser.parse_args()
 
     path = Path(__file__).parents[1] / args.settings
     with open(path, "r") as f:
         estimators = munchify(toml.load(f))
+    estimators.estimator1.drone_name = args.drone_name # overwrite drone_name
 
     # Add debug to each estimator (if not already in place)
     for key, val in estimators.items():
@@ -565,3 +569,4 @@ if __name__ == "__main__":
     estimators = munchify({k: v for k, v in estimators.items() if k.startswith("estimator")})
 
     launch_estimators(estimators)
+

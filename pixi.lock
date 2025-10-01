@@ -3639,7 +3639,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8c/17/8a7503c9dc3f8cc2868c632291e5d224822b05ae62f1279c529c459368d2/array_api_extra-0.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3f/5b/7120e22f6e22ca77283f4a086ab2e59d107f00bfc952116db41a015385fe/casadi-3.7.2-cp313-none-manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl
-      - pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+      - pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
       - pypi: https://files.pythonhosted.org/packages/e7/98/87b5946356095738cb90a6df7b35ff69ac5750f6e783d5fbcc5cb3b6cbd7/etils-1.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e6/cf/d118be069d0fbbfbb6c5591069233678b573e49d81e2a387afb0297528a0/flax-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl
@@ -3722,7 +3722,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8c/17/8a7503c9dc3f8cc2868c632291e5d224822b05ae62f1279c529c459368d2/array_api_extra-0.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/69/85/0512e695a9194795ed126825a2d7781bf1f82a116aaeae9c7525bde7c1d9/casadi-3.7.2-cp313-none-manylinux2014_aarch64.whl
       - pypi: https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl
-      - pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+      - pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
       - pypi: https://files.pythonhosted.org/packages/e7/98/87b5946356095738cb90a6df7b35ff69ac5750f6e783d5fbcc5cb3b6cbd7/etils-1.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e6/cf/d118be069d0fbbfbb6c5591069233678b573e49d81e2a387afb0297528a0/flax-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl
@@ -3788,7 +3788,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8c/17/8a7503c9dc3f8cc2868c632291e5d224822b05ae62f1279c529c459368d2/array_api_extra-0.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/85/23/f13181cd2ba693aeabdb23e6025b2bbae856a23b2a75c57d0bf94bfb6642/casadi-3.7.2-cp313-none-macosx_10_13_x86_64.macosx_10_13_intel.whl
       - pypi: https://files.pythonhosted.org/packages/6f/3d/46bb04776c465cea2dd8aa2d4b61ab610b707f798f47838ef7e6105b025c/chex-0.1.90-py3-none-any.whl
-      - pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+      - pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
       - pypi: https://files.pythonhosted.org/packages/e7/98/87b5946356095738cb90a6df7b35ff69ac5750f6e783d5fbcc5cb3b6cbd7/etils-1.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/d3/c2de519b6b1f0292727406c5c12964fbe0f46bdbdbf92857716e358f1df3/flax-0.10.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl
@@ -3856,7 +3856,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8c/17/8a7503c9dc3f8cc2868c632291e5d224822b05ae62f1279c529c459368d2/array_api_extra-0.9.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/09/b7/087fcbfe2a0a0b44e236c9853d7fa7c539db6b8c60ab5702fffd73be5a7c/casadi-3.7.2-cp313-none-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl
-      - pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+      - pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
       - pypi: https://files.pythonhosted.org/packages/e7/98/87b5946356095738cb90a6df7b35ff69ac5750f6e783d5fbcc5cb3b6cbd7/etils-1.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e6/cf/d118be069d0fbbfbb6c5591069233678b573e49d81e2a387afb0297528a0/flax-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl
@@ -3921,7 +3921,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ba/b7/2c80912fc6655deb6a78fa2ae9aa9a4a3c59ac5daa83f2dd549547441a08/casadi-3.7.2-cp313-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
-      - pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+      - pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
       - pypi: https://files.pythonhosted.org/packages/e7/98/87b5946356095738cb90a6df7b35ff69ac5750f6e783d5fbcc5cb3b6cbd7/etils-1.13.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e6/cf/d118be069d0fbbfbb6c5591069233678b573e49d81e2a387afb0297528a0/flax-0.12.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/47/71/70db47e4f6ce3e5c37a607355f80da8860a33226be640226ac52cb05ef2e/fsspec-2025.9.0-py3-none-any.whl
@@ -7280,7 +7280,7 @@ packages:
 - pypi: ./
   name: drone-estimators
   version: 0.0.1
-  sha256: 67aa437d8bfd9c2b02b2e534f66bec2e5e8e04a0b7b0269886bb9181bbe9a52a
+  sha256: bfb06fc876e307a8b09346df09bc7079e7ae0ea0eb0b206ece0a9d15ae0dce03
   requires_dist:
   - jax
   - numpy>=2.0
@@ -7296,7 +7296,7 @@ packages:
   - pytest-timeout ; extra == 'test'
   - torch ; extra == 'test'
   editable: true
-- pypi: git+https://github.com/utiasDSL/drone-models.git#21d93d4a9deda185b088fc870ee59454e6f54b6c
+- pypi: git+https://github.com/utiasDSL/drone-models.git#4497645a69696885349c22639c7794b563aa183c
   name: drone-models
   version: 0.0.1
   requires_dist:

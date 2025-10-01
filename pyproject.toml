@@ -32,6 +32,11 @@ test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout", "torch"]
 [tool.setuptools.packages]
 find = {}
 
+[tool.setuptools.package-data]
+drone_estimators = [
+    "ros_nodes/*.toml",
+]
+
 [tool.pytest.ini_options]
 markers = ["unit", "integration", "render"]
 addopts = "-m 'not render'"
