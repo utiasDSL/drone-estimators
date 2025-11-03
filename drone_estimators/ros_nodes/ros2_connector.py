@@ -56,9 +56,7 @@ class ROSConnector:
 
     Example:
         >>> # Track drone position and state from estimator
-        >>> conn = ROSConnector(
-        ...     estimator_names=["cf1"], cmd_topic="/estimator/cf1/cmd", timeout=1.0
-        ... )
+        >>> conn = ROSConnector(estimator_names=["cf1"], cmd_topic="/drones/cf1/cmd", timeout=1.0)
         >>> # Access the latest position data
         >>> drone_pos = conn.pos["cf1"]
         >>> # Publish a command (non-blocking)
