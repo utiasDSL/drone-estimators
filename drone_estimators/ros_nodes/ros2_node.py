@@ -545,18 +545,18 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--settings", default="ros_nodes/estimators.toml", help="Path to Settings file"
-    )
-    parser.add_argument(
-        "--drone_name", default="cf52", help="Specify which drone is flying"
-    )
+    parser.add_argument("--settings", default=None, help="Path to settings file in CWD")
+    parser.add_argument("--drone_name", default=None, help="Overwrite drone_name in estimator1")
     args = parser.parse_args()
 
-    path = Path(__file__).parents[1] / args.settings
+    if args.settings is None:
+        path = Path(__file__).parents[1] / "ros_nodes/estimators.toml"
+    else:
+        path = args.settings
     with open(path, "r") as f:
         estimators = munchify(toml.load(f))
-    estimators.estimator1.drone_name = args.drone_name # overwrite drone_name
+    if args.drone_name is not None:
+        estimators.estimator1.drone_name = args.drone_name  # overwrite drone_name
 
     # Add debug to each estimator (if not already in place)
     for key, val in estimators.items():
@@ -569,4 +569,3 @@ if __name__ == "__main__":
     estimators = munchify({k: v for k, v in estimators.items() if k.startswith("estimator")})
 
     launch_estimators(estimators)
-
