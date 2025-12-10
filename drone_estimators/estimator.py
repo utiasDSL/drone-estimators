@@ -17,7 +17,7 @@ from drone_estimators.structs import SigmaPointsSettings, UKFData, UKFSettings
 from drone_estimators.utils.dynamics import dynamics_function, observation_function
 
 if TYPE_CHECKING:
-    from array_api_typing import Array
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
 
 
 class Estimator(ABC):

@@ -16,7 +16,7 @@ import transforms3d as tf
 from drone_estimators.structs import UKFData
 
 if TYPE_CHECKING:
-    from array_api_typing import Array
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
 
 # from drone_estimators.quaternions import apply_omega_to_quat, global_to_body, omega_from_quat_quat
 

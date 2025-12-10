@@ -27,7 +27,7 @@ from drone_estimators.integration import integrate_UKFData
 from drone_estimators.structs import UKFData, UKFSettings
 
 if TYPE_CHECKING:
-    from array_api_typing import Array
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
 
 # rotor_vel: Array | None = None,
 #     dist_f: Array | None = None,

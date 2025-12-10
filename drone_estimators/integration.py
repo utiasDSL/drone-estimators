@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
-    from array_api_typing import Array
-
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
     from drone_estimators.structs import UKFData
 
 

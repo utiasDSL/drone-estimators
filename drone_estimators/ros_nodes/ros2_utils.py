@@ -13,9 +13,9 @@ from visualization_msgs.msg import Marker, MarkerArray
 if TYPE_CHECKING:
     from collections import defaultdict
 
-    from array_api_typing import Array
     from std_msgs.msg import Header
 
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
     from drone_estimators.structs import UKFData
 
 

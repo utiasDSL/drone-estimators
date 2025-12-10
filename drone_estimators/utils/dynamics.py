@@ -10,7 +10,7 @@ from drone_models.core import parametrize
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from array_api_typing import Array
+    from drone_estimators._typing import Array  # To be changed to array_api_typing later
 
 
 def dynamics_function(model: str, config: str) -> Callable:
