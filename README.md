@@ -19,29 +19,47 @@ Drone state estimators @ LSY. Contains model free (smoothing) and model based (E
 [Tests URL]: https://github.com/utiasDSL/drone-estimators/actions/workflows/testing.yml
 
 ## Installation
-Clone repository:
+### Normal 
+Simply install with pip
+```bash
+pip install drone-estimators
+```
 
-`git clone git@github.com:utiasDSL/drone-estimators.git`
+### Development
+Clone repository and install repository:
 
-If you already have an environment to install the estimators in, use:
+```bash
+git clone git@github.com:utiasDSL/drone-estimators.git
+cd drone-estimators
+pixi install
+```
 
-`pip install -e .`
+Now activate the `jazzy` environment and install the package in editable mode
+```bash
+pixi shell -e jazzy
+uv pip install -e .
+```
 
-Otherwise, you can first start a pixi environment and then install the package with 
-
-`pixi shell -e jazzy`
-
-`pip install -e .`
+If you want to have the `drone-models` in editable mode, simply install them too with pip, i.e.,
+```bash
+cd ../drone-models
+uv pip install -e .
+```
 
 ## Usage
 Either use the estimators directly:
 
-`from drone_estimators.estimator import KalmanFilter`
+```bash
+from drone_estimators.estimator import KalmanFilter
+```
 
-or run the ROS2 node with:
+or run the `ROS2` node with:
+```bash
+python -m drone_estimators.ros_nodes.ros2_node
+```
 
-`python drone_estimators/ros_nodes/ros2_node.py`
-
-For the latter, you need to add all drones you want to estimate to the `estimators.toml` file, or create your own file and call
-
-`python drone_estimators/ros_nodes/ros2_node.py --settings <your_estimators.toml>`
+For the latter, you can either add your specific drone to be estimated with default settings or add all drones to the `estimators.toml` file (editable mode), which can be passed as an argument
+```bash
+python -m drone_estimators.ros_nodes.ros2_node --drone <your_drone>
+python -m drone_estimators.ros_nodes.ros2_node --settings <path/to/your/estimators.toml>
+```

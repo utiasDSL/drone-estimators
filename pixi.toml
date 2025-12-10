@@ -1,41 +1,51 @@
-[project]
+[workspace]
 name = "drone_estimators"
-version = "0.0.1"
-description = "TODO"
-authors = ["Marcel Rath <marcel.rath@tum.de>"]
+version = "0.1.0b0"
+description = "State estimators for drones."
+authors = ["Marcel Rath", "Martin Schuck"]
 channels = ["https://fast.prefix.dev/conda-forge"]
-platforms = ["linux-64", "win-64", "osx-64", "osx-arm64", "linux-aarch64"]
+platforms = ["linux-64"]
 
 [dependencies]
 python = ">=3.11.0,<3.14"
 pip = ">=25.0.1,<26"
-# compilers = "*"
-# cmake = "*"
-# pkg-config = "*"
-# make = "*"
-# ninja = "*"
-# rosbags = ">=0.10.9,<0.11"
-# gcc = ">=15.1.0,<15.2"
-# cxx-compiler = ">=1.0.0,<2"
-# gfortran = ">=15.1.0,<15.2"
-openblas = ">=0.3.29,<0.4" # TODO remove once scipy is installed from pip
+uv = "*"
 ruff = "*"
-
-# Conda dependencies
-# numpy = ">=1.0.0"
-# matplotlib = ">=1.0"
-# scipy = ">=1.0"
-
-# [pypi-dependencies]
-# jax = "*"
-# drone-estimators = { path = "./", editable = true }
 
 [target.linux.dependencies]
 libgl-devel = "*"
 
 [environments]
+default = { solve-group = "default" }
+tests = { features = ["tests"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
 jazzy = { features = ["jazzy"] }
-tests = { features = ["tests"], solve-group = "default" } 
+
+# tests
+[feature.tests.pypi-dependencies]
+pytest = ">=8.4.1"
+pytest-timeout = ">=2.1.0"
+drone-estimators = { path = "./", editable = true }
+
+[feature.tests.tasks]
+tests = { cmd = "pytest -v tests", description = "Run tests" }
+
+# docs
+[feature.docs.dependencies]
+mkdocs = ">=1.5.0"
+mkdocs-material = ">=9.0.0"
+python = ">=3.10"
+
+[feature.docs.pypi-dependencies]
+mkdocs-autorefs = ">=1.2.0"
+mkdocstrings = { extras = ["python"], version = ">=0.26.0" }
+mkdocs-gen-files = ">=0.5.0"
+mkdocs-literate-nav = ">=0.6.0"
+mkdocs-section-index = ">=0.3.0"
+
+[feature.docs.tasks]
+docs-serve = { cmd = "mkdocs serve", description = "Serve docs locally" }
+docs-build = { cmd = "mkdocs build", description = "Build docs" }
 
 # jazzy
 [feature.jazzy]
@@ -53,11 +63,3 @@ ros-jazzy-desktop = "*"
 colcon-common-extensions = "*"
 rosdep = "*"
 
-# tests
-[feature.tests.pypi-dependencies]
-pytest = ">=8.4.1"
-pytest-timeout = ">=2.1.0"
-drone-estimators = { path = "./", editable = true }
-
-[feature.tests.tasks]
-tests = { cmd = "pytest -v tests", description = "Run tests" }

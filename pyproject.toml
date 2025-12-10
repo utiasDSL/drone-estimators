@@ -1,8 +1,9 @@
 [project]
 name = "drone_estimators"
-version = "0.0.1"
-description = "TODO"
+version = "0.1.0b0"
+description = "State estimators for drones."
 readme = "README.md"
+authors = [{ name = "Marcel Rath" }, { name = "Martin Schuck" }]
 license = { file = "LICENSE" }
 classifiers = [
     "License :: OSI Approved :: MIT License",
@@ -16,17 +17,18 @@ classifiers = [
 dependencies = [
     "jax",
     "numpy>=2.0",
-    "scipy @ git+https://github.com/scipy/scipy.git@4cb83b6",               # TODO: Replace with scipy 1.17 once released
-    "drone-models @ git+https://github.com/utiasDSL/drone-models.git",      # TODO: Replace with pip version once released
+    "scipy>=1.17.0rc1",
+    "drone-models>=0.1.0b0",
     "munch",
     "transforms3d",
     "flax",
     "array-api-compat",
-    "array-api-typing @ git+https://github.com/data-apis/array-api-typing", # TODO: Replace with array-api-typing from pip once released
     "array-api-extra",
+    # "array-api-typing", To be added back in when properly released on pypi
 ]
 
 [project.optional-dependencies]
+dev = ["drone-models"]  # triggers editable local install in dev
 test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout", "torch"]
 
 [tool.setuptools.packages]
@@ -90,46 +92,3 @@ skip-magic-trailing-comma = true
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
-
-# [tool.pixi.workspace]
-# channels = ["conda-forge"]
-# platforms = ["linux-64"]
-
-# [tool.pixi.pypi-dependencies]
-# drone-estimators = { path = "./", editable = true }
-
-# [tool.pixi.feature.tests.dependencies]
-# pytest = ">=8.4.1"
-# pytest-timeout = ">=2.1.0"
-
-# [tool.pixi.feature.tests.tasks]
-# tests = { cmd = "pytest -v tests", description = "Run tests" }
-
-# [tool.pixi.feature.docs.dependencies]
-# mkdocs = ">=1.5.0"
-# mkdocs-material = ">=9.0.0"
-# python = ">=3.10"
-
-# [tool.pixi.feature.docs.pypi-dependencies]
-# mkdocs-autorefs = ">=1.2.0"
-# mkdocstrings = { extras = ["python"], version = ">=0.26.0" }
-# mkdocs-gen-files = ">=0.5.0"
-# mkdocs-literate-nav = ">=0.6.0"
-# mkdocs-section-index = ">=0.3.0"
-
-# [tool.pixi.feature.docs.tasks]
-# docs-serve = { cmd = "mkdocs serve", description = "Serve docs locally" }
-# docs-build = { cmd = "mkdocs build", description = "Build docs" }
-
-# [tool.pixi.environments]
-# default = { solve-group = "default" }
-# tests = { features = ["tests"], solve-group = "default" }
-# docs = { features = ["docs"], solve-group = "default" }
-
-# [tool.pixi.dependencies]
-# # TODO: Remove compilers once scipy 1.17 is released and drone-models have been updated.
-# gcc = ">=15.1.0,<15.2"
-# cxx-compiler = ">=1.0.0,<2"
-# gfortran = ">=15.1.0,<15.2"
-# openblas = ">=0.3.30,<0.4"
-# ruff = "*"
