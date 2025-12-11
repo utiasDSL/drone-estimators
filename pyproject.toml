@@ -164,3 +164,6 @@ rosdep = "*"
 colcon-common-extensions = "*"
 # Kilted specific tools
 ros-kilted-desktop = "*"
+
+[tool.pixi.feature.kilted.activation]
+scripts = ["setup_mocap.sh"]

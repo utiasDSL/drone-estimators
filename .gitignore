@@ -6,5 +6,6 @@
 
 /build
 /dist
+/ros_ws
 
 .pixi
