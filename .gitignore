@@ -4,4 +4,7 @@
 **/*.vscode
 **/*.pkl
 
+/build
+/dist
+
 .pixi
