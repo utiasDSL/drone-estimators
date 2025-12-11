@@ -19,6 +19,7 @@ libgl-devel = "*"
 default = { solve-group = "default" }
 tests = { features = ["tests"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "default" }
+dist = { features = ["dist"], solve-group = "default" }
 jazzy = { features = ["jazzy"] }
 
 # tests
@@ -47,6 +48,16 @@ mkdocs-section-index = ">=0.3.0"
 docs-serve = { cmd = "mkdocs serve", description = "Serve docs locally" }
 docs-build = { cmd = "mkdocs build", description = "Build docs" }
 
+# distribution
+[feature.dist.pypi-dependencies]
+build = "*"
+twine = "*"
+
+[feature.dist.tasks]
+build = { cmd = "python -m build && twine check dist/*", description = "Build and test the package" }
+upload_test = { cmd = "twine upload -r testpypi dist/*", description = "Test upload of the built package" }
+upload = { cmd = "twine upload dist/*", description = "Upload of the built package" }
+
 # jazzy
 [feature.jazzy]
 channels = ["https://prefix.dev/robostack-jazzy"]
@@ -62,4 +73,3 @@ rosbags = ">=0.10.9,<0.11"
 ros-jazzy-desktop = "*"
 colcon-common-extensions = "*"
 rosdep = "*"
-
