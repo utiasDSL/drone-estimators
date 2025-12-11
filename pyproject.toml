@@ -1,6 +1,6 @@
 [project]
 name = "drone_estimators"
-version = "0.1.0b0"
+version = "0.1.0b1"
 description = "State estimators for drones."
 readme = "README.md"
 authors = [{ name = "Marcel Rath" }, { name = "Martin Schuck" }]
@@ -26,10 +26,6 @@ dependencies = [
     "array-api-extra",
     # "array-api-typing", To be added back in when properly released on pypi
 ]
-
-[project.optional-dependencies]
-dev = ["drone-models"]  # triggers editable local install in dev
-test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout", "torch"]
 
 [tool.setuptools.packages]
 find = {}
@@ -92,3 +88,79 @@ skip-magic-trailing-comma = true
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+
+
+[tool.pixi]
+[tool.pixi.workspace]
+channels = ["https://prefix.dev/conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.dependencies]
+python = "*"
+pip = "*"
+uv = "*"
+ruff = "*"
+
+[tool.pixi.pypi-dependencies]
+drone-estimators = { path = "./", editable = true }
+
+[tool.pixi.target.linux.dependencies]
+libgl-devel = "*"
+
+[tool.pixi.environments]
+default = { features = ["kilted"], solve-group = "default" }
+tests = { features = ["kilted", "tests"], solve-group = "default" }
+docs = { features = ["kilted", "docs"], solve-group = "default" }
+dist = { features = ["kilted", "dist"], solve-group = "default" }
+
+# tests
+[tool.pixi.feature.tests.pypi-dependencies]
+pytest = ">=8.4.1"
+pytest-timeout = ">=2.1.0"
+
+[tool.pixi.feature.tests.tasks]
+tests = { cmd = "pytest -v tests", description = "Run tests" }
+
+# docs
+[tool.pixi.feature.docs.dependencies]
+mkdocs = ">=1.5.0"
+mkdocs-material = ">=9.0.0"
+python = ">=3.10"
+
+[tool.pixi.feature.docs.pypi-dependencies]
+mkdocs-autorefs = ">=1.2.0"
+mkdocstrings = { extras = ["python"], version = ">=0.26.0" }
+mkdocs-gen-files = ">=0.5.0"
+mkdocs-literate-nav = ">=0.6.0"
+mkdocs-section-index = ">=0.3.0"
+
+[tool.pixi.feature.docs.tasks]
+docs-serve = { cmd = "mkdocs serve", description = "Serve docs locally" }
+docs-build = { cmd = "mkdocs build", description = "Build docs" }
+
+# distribution
+[tool.pixi.feature.dist.pypi-dependencies]
+build = "*"
+twine = "*"
+
+[tool.pixi.feature.dist.tasks]
+build = { cmd = "python -m build && twine check dist/*", description = "Build and test the package" }
+upload_test = { cmd = "twine upload -r testpypi dist/*", description = "Test upload of the built package" }
+upload = { cmd = "twine upload dist/*", description = "Upload of the built package" }
+
+# ROS Kilted
+[tool.pixi.feature.kilted]
+channels = ["https://prefix.dev/robostack-kilted"]
+
+[tool.pixi.feature.kilted.dependencies]
+# Build tools
+compilers = "*"
+cmake = "*"
+pkg-config = "*"
+make = "*"
+ninja = "*"
+# ROS specific tools
+rosdep = "*"
+colcon-common-extensions = "*"
+# Kilted specific tools
+ros-kilted-desktop = "*"
