@@ -547,6 +547,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--settings", default=None, help="Path to settings file in CWD")
     parser.add_argument("--drone_name", default=None, help="Overwrite drone_name in estimator1")
+    parser.add_argument(
+        "--legacy", action="store_true", help="Overwrite estimator type in estimator1"
+    )
     args = parser.parse_args()
 
     if args.settings is None:
@@ -557,6 +560,8 @@ if __name__ == "__main__":
         estimators = munchify(toml.load(f))
     if args.drone_name is not None:
         estimators.estimator1.drone_name = args.drone_name  # overwrite drone_name
+    if args.legacy:
+        estimators.estimator1.estimator_type = "legacy"  # overwrite estimator type
 
     # Add debug to each estimator (if not already in place)
     for key, val in estimators.items():
