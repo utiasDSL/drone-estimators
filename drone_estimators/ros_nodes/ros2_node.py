@@ -105,7 +105,7 @@ class MPEstimator:
         # (3d) and the fourth is the quaternion (4d)
         self._tf_msg_buffer = ctx.Array("d", [0.0] * (1 + 1 + 3 + 4))
         # Allocate the command subscriber buffer
-        cmd_dim = 4 if settings.estimator_type != "legacy" else 13
+        cmd_dim = 4
         self._cmd_msg_buffer = ctx.Array("d", [0.0] * (1 + 1 + cmd_dim))
         # Estimated state publisher buffers
         self._pose_buffer = ctx.Array("d", [0.0] * 7)
@@ -346,7 +346,7 @@ class MPEstimator:
             with _cmd_msg_buffer.get_lock():
                 _cmd_msg_buffer[0] += 1
                 _cmd_msg_buffer[1] = time.time()
-                _cmd_msg_buffer[2:] = msg.data
+                _cmd_msg_buffer[2:] = msg.data[:4]  # slice as cmd_dim
 
         def calibration_callback(
             request: Trigger.Request, response: Trigger.Response
