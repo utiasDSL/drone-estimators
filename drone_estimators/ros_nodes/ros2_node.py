@@ -105,7 +105,7 @@ class MPEstimator:
         # (3d) and the fourth is the quaternion (4d)
         self._tf_msg_buffer = ctx.Array("d", [0.0] * (1 + 1 + 3 + 4))
         # Allocate the command subscriber buffer
-        cmd_dim = 4  # May change in the future to be dynamic
+        cmd_dim = 4 if settings.estimator_type != "legacy" else 13
         self._cmd_msg_buffer = ctx.Array("d", [0.0] * (1 + 1 + cmd_dim))
         # Estimated state publisher buffers
         self._pose_buffer = ctx.Array("d", [0.0] * 7)
