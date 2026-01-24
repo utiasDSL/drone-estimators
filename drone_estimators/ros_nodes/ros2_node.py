@@ -365,6 +365,15 @@ class MPEstimator:
             response.success = True
             response.message = "Pose calibrated successfully."
             return response
+        
+        def remove_calibration_callback(
+               request: Trigger.Request, response: Trigger.Response
+        ) -> Trigger.Response:
+            nonlocal calibration_rot
+            calibration_rot = R.from_quat(np.array([0.0, 0.0, 0.0, 1.0]))
+            response.success = True
+            response.message = "Calibration deleted successfully."
+            return response
 
         sub_tf = node.create_subscription(TFMessage, "/tf", tf_callback, qos_profile=qos_profile)
         sub_cmd = node.create_subscription(
@@ -376,6 +385,9 @@ class MPEstimator:
         sub_calib = node.create_service(
             Trigger, f"/drones/{drone_name}/calibration", calibration_callback
         )
+        sub_remove_calib = node.create_service(
+            Trigger, f"/drones/{drone_name}/remove_calibration", remove_calibration_callback
+        )
         startup.wait(10.0)  # Register this process as ready for startup barrier
 
         while not shutdown.is_set():
@@ -383,6 +395,7 @@ class MPEstimator:
         sub_tf.destroy()
         sub_cmd.destroy()
         sub_calib.destroy()
+        sub_remove_calib.destroy()
         node.destroy_node()
 
     @staticmethod
