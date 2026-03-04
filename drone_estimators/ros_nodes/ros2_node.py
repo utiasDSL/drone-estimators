@@ -359,16 +359,17 @@ class MPEstimator:
                 response.message = "Pose could not be calibrated, deck tilted too much."
                 return response
 
-            node.get_logger().warning("Calibration successful.")
+            node.get_logger().info("Calibration successful.")
             nonlocal calibration_rot
             calibration_rot = last_rot
             response.success = True
             response.message = "Pose calibrated successfully."
             return response
-        
+
         def remove_calibration_callback(
-               request: Trigger.Request, response: Trigger.Response
+            request: Trigger.Request, response: Trigger.Response
         ) -> Trigger.Response:
+            node.get_logger().info("Calibration deleted successfully.")
             nonlocal calibration_rot
             calibration_rot = R.from_quat(np.array([0.0, 0.0, 0.0, 1.0]))
             response.success = True
